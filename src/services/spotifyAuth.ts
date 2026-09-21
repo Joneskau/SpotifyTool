@@ -29,6 +29,11 @@ export const SPOTIFY_SCOPES: SpotifyScopeDetail[] = [
     purpose: 'Create and add tracks to private playlists you manage.',
   },
   {
+    scope: 'ugc-image-upload',
+    category: 'Playlists',
+    purpose: 'Upload custom cover images to your created playlists.',
+  },
+  {
     scope: 'user-read-private',
     category: 'User',
     purpose: 'Retrieve your display name and avatar so you know which account is active.',
@@ -180,6 +185,9 @@ export async function exchangeCodeForToken(code: string): Promise<string> {
       'spotify_token_expiry',
       (Date.now() + data.expires_in * 1000).toString()
     );
+    if (data.scope) {
+      storage.setItem('spotify_granted_scopes', data.scope);
+    }
     if (data.refresh_token) {
       storage.setItem('spotify_refresh_token', data.refresh_token);
     }
@@ -218,6 +226,9 @@ export async function refreshAccessToken(): Promise<string | null> {
         'spotify_token_expiry',
         (Date.now() + data.expires_in * 1000).toString()
       );
+      if (data.scope) {
+        storage.setItem('spotify_granted_scopes', data.scope);
+      }
       if (data.refresh_token) {
         storage.setItem('spotify_refresh_token', data.refresh_token);
       }
@@ -227,6 +238,25 @@ export async function refreshAccessToken(): Promise<string | null> {
     console.error('Failed to refresh access token:', error);
   }
   return null;
+}
+
+export function getGrantedScopes(): string[] {
+  const storage = getActiveStorage();
+  const scopes =
+    storage.getItem('spotify_granted_scopes') ||
+    localStorage.getItem('spotify_granted_scopes') ||
+    sessionStorage.getItem('spotify_granted_scopes') ||
+    '';
+  return scopes.split(' ').filter(Boolean);
+}
+
+export function hasGrantedScope(scope: string): boolean {
+  const granted = getGrantedScopes();
+  if (granted.length === 0) {
+    // If no scopes were recorded (e.g. legacy session), assume true to avoid blocking unnecessarily
+    return true;
+  }
+  return granted.includes(scope);
 }
 
 export function getStoredValidToken(): string | null {

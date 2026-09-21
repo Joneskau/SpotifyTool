@@ -19,6 +19,9 @@ export const SpotifyAlbumSimplifiedSchema = z.object({
   images: z.array(SpotifyImageSchema).default([]),
   artists: z.array(SpotifyArtistSimplifiedSchema).default([]),
   popularity: z.number().optional(),
+  album_type: z.enum(['album', 'single', 'compilation']).catch('album'),
+  total_tracks: z.number().optional(),
+  restrictions: z.object({ reason: z.string().optional() }).optional(),
 });
 
 export const SpotifyTrackSimplifiedSchema = z.object({
@@ -27,6 +30,9 @@ export const SpotifyTrackSimplifiedSchema = z.object({
   uri: z.string(),
   duration_ms: z.number(),
   track_number: z.number().optional(),
+  explicit: z.boolean().optional(),
+  is_playable: z.boolean().optional(),
+  restrictions: z.object({ reason: z.string().optional() }).optional(),
 });
 
 export const SpotifyTrackFullSchema = SpotifyTrackSimplifiedSchema.extend({
@@ -42,10 +48,63 @@ export const SpotifyUserSchema = z.object({
 export const SpotifyPlaylistSimplifiedSchema = z.object({
   id: z.string(),
   name: z.string(),
-  images: z.array(SpotifyImageSchema).nullable().optional().default([]),
-  tracks: z.object({
-    total: z.number().default(0),
-  }),
+  description: z.string().nullable().optional(),
+  images: z
+    .array(SpotifyImageSchema)
+    .nullish()
+    .transform(val => val ?? []),
+  snapshot_id: z.string().optional(),
+  owner: z
+    .object({
+      id: z.string(),
+      display_name: z.string().nullable().optional(),
+    })
+    .optional(),
+  public: z.boolean().nullable().optional(),
+  collaborative: z.boolean().nullable().optional(),
+  tracks: z
+    .object({
+      total: z.number().default(0),
+    })
+    .optional(),
+  items: z
+    .object({
+      total: z.number().default(0),
+    })
+    .optional(),
+});
+
+export const SpotifySnapshotResponseSchema = z.object({
+  snapshot_id: z.string(),
+});
+
+export const SpotifyPlaylistDetailsSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  images: z
+    .array(SpotifyImageSchema)
+    .nullish()
+    .transform(val => val ?? []),
+  snapshot_id: z.string().optional(),
+  owner: z
+    .object({
+      id: z.string(),
+      display_name: z.string().nullable().optional(),
+    })
+    .optional(),
+  public: z.boolean().nullable().optional(),
+  collaborative: z.boolean().nullable().optional(),
+  tracks: z
+    .object({
+      total: z.number().default(0),
+    })
+    .optional(),
+  items: z
+    .object({
+      total: z.number().default(0),
+    })
+    .optional(),
 });
 
 export const SpotifySearchAlbumsResponseSchema = z.object({

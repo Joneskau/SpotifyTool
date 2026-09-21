@@ -5,6 +5,8 @@ import { MatchedAlbum, TieringOptions } from '../types/app';
 const mockAlbums: MatchedAlbum[] = [
   {
     status: 'found',
+    originalInput: 'Radiohead - OK Computer',
+    confidence: 0.95,
     artist: 'Radiohead',
     album: {
       id: 'alb1',
@@ -23,6 +25,8 @@ const mockAlbums: MatchedAlbum[] = [
   },
   {
     status: 'found',
+    originalInput: 'Daft Punk - Discovery',
+    confidence: 0.9,
     artist: 'Daft Punk',
     album: {
       id: 'alb2',

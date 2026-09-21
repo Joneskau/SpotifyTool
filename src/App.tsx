@@ -11,15 +11,23 @@ import {
   getUserProfile,
   getUserPlaylists,
   getPlaylistTracks,
+  getPlaylistDetails,
   searchAlbumWithStrategies,
   getAlbumTracks,
   createNewPlaylist,
-  addTracksToPlaylist,
+  uploadPlaylistCoverImage,
+  addTracksBatchWithReconciliation,
 } from './services/spotifyApi';
 import { asyncPool } from './utils/asyncPool';
 import { parseAlbumLine } from './utils/fuzzyMatch';
 import { calculatePlaylistTiers } from './utils/tiering';
-import { MatchedAlbum, FailedAlbum, TieringOptions } from './types/app';
+import {
+  MatchedAlbum,
+  FailedAlbum,
+  TieringOptions,
+  PublishBatch,
+  PublishSession,
+} from './types/app';
 
 import { Header } from './components/Header';
 import { AuthSection } from './components/AuthSection';
@@ -34,7 +42,7 @@ import { StatusLog } from './components/StatusLog';
 import { ToastContainer } from './components/ToastContainer';
 import { ReconnectModal } from './components/ReconnectModal';
 import { Footer } from './components/Footer';
-import { Search, Send, Edit3, Loader2 } from 'lucide-react';
+import { Search, Send, Edit3, Loader2, Play } from 'lucide-react';
 
 export const App: React.FC = () => {
   const {
@@ -43,12 +51,21 @@ export const App: React.FC = () => {
     setTokenExpiresAt,
     setStorageType,
     setUserProfile,
+    playlists,
     setPlaylists,
     setIsLoadingPlaylists,
-    selectedPlaylistId,
+    targetPlaylistMode,
+    selectedExistingPlaylistId,
     setSelectedPlaylistId,
     newPlaylistName,
     setNewPlaylistName,
+    newPlaylistDescription,
+    newPlaylistIsPublic,
+    newPlaylistCoverImage,
+    setDuplicateCheckStatus,
+    setDuplicateCheckProgress,
+    playlistTrackCache,
+    cachePlaylistTracks,
     albumListText,
     setAlbumListText,
     isProcessing,
@@ -56,6 +73,15 @@ export const App: React.FC = () => {
     setIsCancelled,
     setProgress,
     resetProgress,
+    setDetailedProgress,
+    publishSession,
+    setPublishSession,
+    startPublishSession,
+    updatePublishBatch,
+    pausePublishSession,
+    clearPublishSession,
+    addPublishFailure,
+    clearPublishFailures,
     matchedAlbums,
     setMatchedAlbums,
     setFailedAlbums,
@@ -69,6 +95,7 @@ export const App: React.FC = () => {
   } = useAppStore();
 
   const [isCommitting, setIsCommitting] = useState(false);
+
 
   // 1. Check for tokens or auth code on mount
   useEffect(() => {
@@ -164,6 +191,66 @@ export const App: React.FC = () => {
     loadData();
   }, [accessToken, setUserProfile, setPlaylists, setIsLoadingPlaylists]);
 
+  // 2b. Reactive target playlist track fetching and duplicate check
+  useEffect(() => {
+    if (!accessToken || targetPlaylistMode === 'new' || !selectedExistingPlaylistId) {
+      setExistingTrackUris(new Set());
+      setDuplicateCheckStatus('idle');
+      setDuplicateCheckProgress({ current: 0, total: 0 });
+      return;
+    }
+
+    const playlist = playlists.find(p => p.id === selectedExistingPlaylistId);
+    const snapshotId = playlist?.snapshot_id || 'v1';
+    const cacheKey = `${selectedExistingPlaylistId}:${snapshotId}`;
+
+    const cached = playlistTrackCache.get(cacheKey);
+    if (cached) {
+      setExistingTrackUris(cached);
+      setDuplicateCheckStatus('success');
+      setDuplicateCheckProgress({ current: cached.size, total: cached.size });
+      return;
+    }
+
+    const abortController = new AbortController();
+    setDuplicateCheckStatus('checking');
+    setDuplicateCheckProgress({ current: 0, total: playlist?.tracks?.total || 0 });
+
+    getPlaylistTracks(selectedExistingPlaylistId, accessToken, {
+      signal: abortController.signal,
+      onProgress: (current, total) => {
+        setDuplicateCheckProgress({ current, total });
+      },
+    })
+      .then(trackUris => {
+        cachePlaylistTracks(cacheKey, trackUris);
+        setExistingTrackUris(trackUris);
+        setDuplicateCheckStatus('success');
+      })
+      .catch(err => {
+        if (err?.name === 'AbortError' || (err instanceof DOMException && err.name === 'AbortError')) {
+          return;
+        }
+        console.warn('Failed to load playlist tracks:', err);
+        setExistingTrackUris(new Set());
+        setDuplicateCheckStatus('error');
+      });
+
+    return () => {
+      abortController.abort();
+    };
+  }, [
+    accessToken,
+    targetPlaylistMode,
+    selectedExistingPlaylistId,
+    playlists,
+    playlistTrackCache,
+    setExistingTrackUris,
+    setDuplicateCheckStatus,
+    setDuplicateCheckProgress,
+    cachePlaylistTracks,
+  ]);
+
   // 3. Search & Process albums
   const handleProcessAlbums = async () => {
     if (!accessToken) return;
@@ -174,23 +261,14 @@ export const App: React.FC = () => {
       return;
     }
 
-    if (!selectedPlaylistId) {
-      addToast('Please select a target playlist', 'error');
-      return;
-    }
-
-    if (selectedPlaylistId === 'NEW' && !newPlaylistName.trim()) {
+    if (targetPlaylistMode === 'new' && !newPlaylistName.trim()) {
       addToast('Please enter a name for the new playlist', 'error');
       return;
     }
 
-    // Check existing tracks in selected playlist to detect duplicates
-    if (selectedPlaylistId !== 'NEW') {
-      addStatusLog('Checking existing tracks in target playlist...', 'info');
-      const existing = await getPlaylistTracks(selectedPlaylistId, accessToken);
-      setExistingTrackUris(existing);
-    } else {
-      setExistingTrackUris(new Set());
+    if (targetPlaylistMode === 'existing' && !selectedExistingPlaylistId) {
+      addToast('Please select a target playlist', 'error');
+      return;
     }
 
     setIsProcessing(true);
@@ -199,15 +277,32 @@ export const App: React.FC = () => {
     setMatchedAlbums([]);
     setFailedAlbums([]);
 
-    let processedCount = 0;
+    let searchedCount = 0;
+    let matchedCount = 0;
+    let failedCount = 0;
     const total = lines.length;
     const localMatched: MatchedAlbum[] = [];
     const localFailed: FailedAlbum[] = [];
 
+    setDetailedProgress({
+      stage: 'searching',
+      searching: { current: 0, total },
+      matching: { current: 0, total },
+      addingTracks: { current: 0, total: 0 },
+      failedCount: 0,
+      statusMessage: 'Searching albums on Spotify...',
+      startTime: Date.now(),
+    });
+
     const processOne = async (line: string) => {
       if (useAppStore.getState().isCancelled) {
-        processedCount++;
-        setProgress(processedCount, total);
+        searchedCount++;
+        failedCount++;
+        setProgress(searchedCount, total);
+        setDetailedProgress({
+          searching: { current: searchedCount, total },
+          failedCount,
+        });
         return {
           status: 'cancelled' as const,
           line,
@@ -220,8 +315,13 @@ export const App: React.FC = () => {
       const parsed = parseAlbumLine(line);
       if (parsed.error || !parsed.artist || !parsed.albumName) {
         addStatusLog(`⚠️ Skipping invalid line: ${line}`, 'error');
-        processedCount++;
-        setProgress(processedCount, total);
+        searchedCount++;
+        failedCount++;
+        setProgress(searchedCount, total);
+        setDetailedProgress({
+          searching: { current: searchedCount, total },
+          failedCount,
+        });
         return {
           status: 'skipped' as const,
           line,
@@ -235,11 +335,17 @@ export const App: React.FC = () => {
 
       try {
         const searchResult = await searchAlbumWithStrategies(artist, albumName, accessToken);
+        searchedCount++;
 
         if (!searchResult || searchResult.candidates.length === 0) {
           addStatusLog(`❌ Not found: ${artist} - ${albumName}`, 'error');
-          processedCount++;
-          setProgress(processedCount, total, `${artist} - ${albumName}`);
+          failedCount++;
+          setProgress(searchedCount, total, `${artist} - ${albumName}`);
+          setDetailedProgress({
+            searching: { current: searchedCount, total },
+            failedCount,
+            currentItem: `${artist} - ${albumName}`,
+          });
           return {
             status: 'not_found' as const,
             line,
@@ -249,27 +355,48 @@ export const App: React.FC = () => {
           };
         }
 
+        // Matching stage: fetch tracks
+        setDetailedProgress({
+          stage: 'matching',
+          searching: { current: searchedCount, total },
+          currentItem: `Fetching tracks for ${artist} - ${searchResult.best.name}...`,
+        });
+
         const best = searchResult.best;
         const tracks = await getAlbumTracks(best.id, accessToken);
+        matchedCount++;
 
         addStatusLog(`✅ Found: ${best.name} - ${artist}`, 'success');
-        processedCount++;
-        setProgress(processedCount, total, `${artist} - ${best.name}`);
+        setProgress(searchedCount, total, `${artist} - ${best.name}`);
+        setDetailedProgress({
+          searching: { current: searchedCount, total },
+          matching: { current: matchedCount, total },
+          currentItem: `${artist} - ${best.name}`,
+        });
 
         return {
           status: 'found' as const,
+          originalInput: line,
           artist,
           album: best,
           candidates: searchResult.candidates,
           trackUris: tracks.map((t: { uri: string }) => t.uri),
           trackObjects: tracks,
           selected: true,
+          confidence: best.matchScore || 0,
+          matchSource: 'auto' as const,
         };
       } catch (err: unknown) {
         const reason = err instanceof Error ? err.message : 'API error';
         addStatusLog(`❌ Error: ${artist} - ${albumName} (${reason})`, 'error');
-        processedCount++;
-        setProgress(processedCount, total, `${artist} - ${albumName}`);
+        searchedCount++;
+        failedCount++;
+        setProgress(searchedCount, total, `${artist} - ${albumName}`);
+        setDetailedProgress({
+          searching: { current: searchedCount, total },
+          failedCount,
+          currentItem: `${artist} - ${albumName}`,
+        });
         return {
           status: 'error' as const,
           line,
@@ -305,6 +432,10 @@ export const App: React.FC = () => {
     setMatchedAlbums(localMatched);
     setFailedAlbums(localFailed);
     setIsProcessing(false);
+    setDetailedProgress({
+      stage: 'completed',
+      statusMessage: `Search completed: ${localMatched.length} found, ${localFailed.length} failed`,
+    });
 
     if (localMatched.length > 0) {
       addToast(`Found ${localMatched.length} album(s)! Please review matches.`, 'success');
@@ -313,7 +444,179 @@ export const App: React.FC = () => {
     }
   };
 
-  // 4. Commit and create playlists
+  // 4. Sequential execution of publish session (halt on first failure for order preservation)
+  const runPublishExecution = async (activeSession: PublishSession) => {
+    if (!accessToken) return;
+    setIsCommitting(true);
+    setDetailedProgress({
+      stage: 'publishing',
+      statusMessage: 'Publishing tracks to Spotify...',
+    });
+
+    try {
+      const userProfile = await getUserProfile(accessToken);
+      const abortController = new AbortController();
+
+      for (let bIndex = 0; bIndex < activeSession.batches.length; bIndex++) {
+        const batch = activeSession.batches[bIndex];
+        if (batch.status === 'completed') {
+          continue; // Skip completed batches when resuming
+        }
+
+        const playlistName = `${activeSession.basePlaylistName}${batch.tierSuffix}`;
+
+        // Resolve or create target playlist
+        let targetPlaylistId = batch.targetPlaylistId;
+        if (!targetPlaylistId) {
+          if (batch.tierIndex === 0 && !activeSession.isNewPlaylist) {
+            targetPlaylistId = activeSession.targetPlaylistId;
+          } else if (activeSession.createdPlaylists[batch.tierIndex]) {
+            targetPlaylistId = activeSession.createdPlaylists[batch.tierIndex].id;
+          } else {
+            addStatusLog(`Creating new playlist: "${playlistName}"...`, 'info');
+            targetPlaylistId = await createNewPlaylist(
+              userProfile.id,
+              playlistName,
+              accessToken,
+              {
+                description: activeSession.newPlaylistOptions?.description,
+                isPublic: activeSession.newPlaylistOptions?.isPublic,
+              }
+            );
+            activeSession.createdPlaylists[batch.tierIndex] = {
+              id: targetPlaylistId,
+              name: playlistName,
+            };
+          }
+          batch.targetPlaylistId = targetPlaylistId;
+        }
+
+        // Re-check 10,000 track limit for target playlist before sending batch
+        try {
+          const details = await getPlaylistDetails(targetPlaylistId, accessToken);
+          if (details.tracks.total + batch.trackUris.length > 10000) {
+            const limitMsg = `Target playlist "${playlistName}" would exceed Spotify's 10,000 track limit (currently has ${details.tracks.total} tracks).`;
+            addPublishFailure({
+              id: Math.random().toString(36).slice(2),
+              batchId: batch.id,
+              tierIndex: batch.tierIndex,
+              batchIndex: batch.batchIndex,
+              playlistName,
+              trackCount: batch.trackUris.length,
+              trackNames: batch.trackNames,
+              reason: limitMsg,
+              timestamp: Date.now(),
+            });
+            pausePublishSession(limitMsg);
+            addToast(limitMsg, 'error');
+            setIsCommitting(false);
+            return;
+          }
+        } catch {
+          // If details check fails, continue
+        }
+
+        updatePublishBatch(batch.id, { status: 'in_progress', targetPlaylistId });
+        setDetailedProgress({
+          statusMessage: `Adding batch ${bIndex + 1} of ${activeSession.batches.length} (${batch.trackUris.length} tracks) to "${playlistName}"...`,
+        });
+
+        const result = await addTracksBatchWithReconciliation(
+          targetPlaylistId,
+          batch.trackUris,
+          accessToken,
+          {
+            signal: abortController.signal,
+            onRateLimited: msg => addStatusLog(msg, 'info'),
+          }
+        );
+
+        if (result.success) {
+          updatePublishBatch(batch.id, { status: 'completed' }, result.snapshot_id);
+          addStatusLog(
+            `Added batch ${batch.batchIndex + 1} (${batch.trackUris.length} tracks) to "${playlistName}"${result.reconciled ? ' [Reconciled]' : ''}`,
+            'success'
+          );
+        } else {
+          // Batch failed! Halt sequentially, mark paused, and preserve session state
+          updatePublishBatch(batch.id, { status: 'failed', error: result.error });
+          addPublishFailure({
+            id: Math.random().toString(36).slice(2),
+            batchId: batch.id,
+            tierIndex: batch.tierIndex,
+            batchIndex: batch.batchIndex,
+            playlistName,
+            trackCount: batch.trackUris.length,
+            trackNames: batch.trackNames,
+            reason: result.error || 'Failed to add tracks',
+            status: result.status,
+            timestamp: Date.now(),
+          });
+          const pauseReason = result.error || 'Batch addition failed';
+          pausePublishSession(pauseReason);
+          addToast(
+            `Publishing paused: ${pauseReason}. Click "Resume Publishing" to continue.`,
+            'error'
+          );
+          addStatusLog(`Publishing paused at batch ${bIndex + 1}: ${pauseReason}`, 'error');
+          setIsCommitting(false);
+          return;
+        }
+      }
+
+      // Best-effort cover image upload if custom cover attached
+      if (
+        activeSession.isNewPlaylist &&
+        activeSession.newPlaylistOptions?.coverImageBase64 &&
+        activeSession.newPlaylistOptions.coverStatus === 'pending'
+      ) {
+        const basePlaylistId = activeSession.createdPlaylists[0]?.id;
+        if (basePlaylistId) {
+          addStatusLog('Uploading custom playlist cover image...', 'info');
+          try {
+            const ok = await uploadPlaylistCoverImage(
+              basePlaylistId,
+              activeSession.newPlaylistOptions.coverImageBase64,
+              accessToken
+            );
+            if (ok) {
+              activeSession.newPlaylistOptions.coverStatus = 'uploaded';
+              addStatusLog('Custom cover image uploaded successfully.', 'success');
+            } else {
+              activeSession.newPlaylistOptions.coverStatus = 'failed';
+              addStatusLog('Cover image upload was not accepted (non-fatal).', 'error');
+            }
+          } catch {
+            activeSession.newPlaylistOptions.coverStatus = 'failed';
+          }
+        }
+      }
+
+      // All batches completed successfully!
+      setDetailedProgress({
+        stage: 'completed',
+        statusMessage: 'All tracks successfully published to Spotify!',
+      });
+      addToast(
+        `Successfully published ${activeSession.totalTracks} tracks to Spotify!`,
+        'success'
+      );
+      clearPublishSession();
+      clearPublishFailures();
+      localStorage.removeItem('spotify_album_list');
+      useAppStore.getState().setAlbumListText('');
+      setTimeout(resetToSearch, 3500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error committing to Spotify';
+      pausePublishSession(msg);
+      addToast(msg, 'error');
+      addStatusLog(`Commit Error: ${msg}`, 'error');
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
+  // 5. Commit and start publish session
   const handleCommit = async () => {
     if (!accessToken) return;
 
@@ -323,7 +626,28 @@ export const App: React.FC = () => {
       return;
     }
 
-    const tiers = calculatePlaylistTiers(selectedAlbums, tierOptions, existingTrackUris);
+    const isNew = targetPlaylistMode === 'new';
+    if (isNew && !newPlaylistName.trim()) {
+      addToast('Please enter a name for the new playlist', 'error');
+      return;
+    }
+    if (!isNew && !selectedExistingPlaylistId) {
+      addToast('Please select a target playlist', 'error');
+      return;
+    }
+
+    // Refresh existingTrackUris if target is existing playlist and not yet loaded
+    let currentExistingUris = existingTrackUris;
+    if (!isNew && currentExistingUris.size === 0 && selectedExistingPlaylistId) {
+      try {
+        currentExistingUris = await getPlaylistTracks(selectedExistingPlaylistId, accessToken);
+        setExistingTrackUris(currentExistingUris);
+      } catch {
+        // Continue if check fails
+      }
+    }
+
+    const tiers = calculatePlaylistTiers(selectedAlbums, tierOptions, currentExistingUris);
     if (tiers.length === 0 || tiers.every(t => t.tracks.length === 0)) {
       addToast('No new tracks to add after removing duplicates.', 'error');
       return;
@@ -342,63 +666,105 @@ export const App: React.FC = () => {
       return;
     }
 
-    const baseName =
-      selectedPlaylistId === 'NEW'
-        ? newPlaylistName.trim() || 'New Playlist'
-        : useAppStore.getState().playlists.find(p => p.id === selectedPlaylistId)?.name ||
-          'My Playlist';
-
-    setIsCommitting(true);
-    addStatusLog(`🎵 Creating ${tiers.length} playlist(s)...`, 'info');
-
-    try {
-      const userProfile = await getUserProfile(accessToken);
-      const createdList: { name: string; count: number }[] = [];
-
-      for (let i = 0; i < tiers.length; i++) {
-        const tier = tiers[i];
-        const playlistName = `${baseName}${tier.nameSuffix}`;
-
-        let targetId: string | null = null;
-        if (i === 0 && selectedPlaylistId !== 'NEW') {
-          targetId = selectedPlaylistId;
-          addStatusLog(
-            `Adding ${tier.tracks.length} tracks to existing playlist "${baseName}"...`,
-            'info'
-          );
-        } else {
-          addStatusLog(`Creating new playlist: "${playlistName}"...`, 'info');
-          targetId = await createNewPlaylist(userProfile.id, playlistName, accessToken);
-        }
-
-        if (targetId && tier.tracks.length > 0) {
-          await addTracksToPlaylist(targetId, tier.tracks, accessToken);
-          createdList.push({ name: playlistName, count: tier.tracks.length });
-        }
+    // Check Spotify 10,000 track limit upfront
+    if (!isNew) {
+      const targetPlaylist = useAppStore.getState().playlists.find(p => p.id === selectedExistingPlaylistId);
+      const currentCount = targetPlaylist?.tracks?.total || 0;
+      const tier0Tracks = tiers[0]?.tracks.length || 0;
+      if (currentCount + tier0Tracks > 10000) {
+        addToast(
+          `Blocked: Adding ${tier0Tracks} tracks exceeds Spotify's 10,000 limit (${currentCount} current + ${tier0Tracks} new = ${currentCount + tier0Tracks}).`,
+          'error'
+        );
+        return;
       }
-
-      const totalTracks = createdList.reduce((sum, p) => sum + p.count, 0);
-      addToast(
-        `🎉 Successfully created ${createdList.length} playlist(s) with ${totalTracks} tracks!`,
-        'success'
-      );
-
-      createdList.forEach(p => {
-        addStatusLog(`   ✅ "${p.name}" - ${p.count} tracks`, 'info');
-      });
-
-      // Clear input
-      localStorage.removeItem('spotify_album_list');
-      useAppStore.getState().setAlbumListText('');
-      setTimeout(resetToSearch, 3000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error committing to Spotify';
-      addToast(msg, 'error');
-      addStatusLog(`Commit Error: ${msg}`, 'error');
-    } finally {
-      setIsCommitting(false);
     }
+
+    const baseName = isNew
+      ? newPlaylistName.trim()
+      : useAppStore.getState().playlists.find(p => p.id === selectedExistingPlaylistId)?.name ||
+        'My Playlist';
+
+    const targetPlaylistId = isNew ? 'NEW' : selectedExistingPlaylistId;
+
+    // Build 100-track batches
+    const batches: PublishBatch[] = [];
+    tiers.forEach((tier, tierIndex) => {
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < tier.tracks.length; i += BATCH_SIZE) {
+        const batchTrackUris = tier.tracks.slice(i, i + BATCH_SIZE);
+        const trackNames: string[] = [];
+        batchTrackUris.forEach(uri => {
+          for (const a of selectedAlbums) {
+            const found = a.trackObjects?.find(t => t.uri === uri);
+            if (found) {
+              trackNames.push(`${a.artist} - ${found.name}`);
+              break;
+            }
+          }
+        });
+        batches.push({
+          id: `${tierIndex}-${Math.floor(i / BATCH_SIZE)}`,
+          tierIndex,
+          tierSuffix: tier.nameSuffix,
+          batchIndex: Math.floor(i / BATCH_SIZE),
+          trackUris: batchTrackUris,
+          trackNames,
+          status: 'pending',
+        });
+      }
+    });
+
+    const totalTracks = batches.reduce((sum, b) => sum + b.trackUris.length, 0);
+    const session: PublishSession = {
+      id: Math.random().toString(36).slice(2),
+      basePlaylistName: baseName,
+      targetPlaylistId,
+      isNewPlaylist: isNew,
+      newPlaylistOptions: isNew
+        ? {
+            name: newPlaylistName.trim(),
+            description: newPlaylistDescription.trim(),
+            isPublic: newPlaylistIsPublic,
+            coverImageBase64: newPlaylistCoverImage?.base64 || null,
+            coverStatus: newPlaylistCoverImage ? 'pending' : 'skipped',
+          }
+        : undefined,
+      createdPlaylists: {},
+      batches,
+      currentBatchIndex: 0,
+      totalTracks,
+      isPaused: false,
+    };
+
+    startPublishSession(session);
+    await runPublishExecution(session);
   };
+
+  // 6. Resume publishing from first incomplete batch
+  const handleResumePublish = async () => {
+    const session = useAppStore.getState().publishSession;
+    if (!session || !accessToken) return;
+
+    const validToken = getStoredValidToken() || (await refreshAccessToken());
+    if (!validToken) {
+      useAppStore.getState().setIsSessionExpiredModalOpen(true);
+      return;
+    }
+
+    addToast('Resuming publish session...', 'info');
+    addStatusLog('Resuming publishing from first incomplete batch...', 'info');
+    clearPublishFailures();
+
+    const unpausedSession: PublishSession = {
+      ...session,
+      isPaused: false,
+      pauseReason: undefined,
+    };
+    setPublishSession(unpausedSession);
+    await runPublishExecution(unpausedSession);
+  };
+
 
   return (
     <div className="min-h-screen bg-[#121212] text-white flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 font-sans transition-colors">
@@ -437,7 +803,10 @@ export const App: React.FC = () => {
               </div>
 
               {/* Progress Banner */}
-              <ProgressBanner />
+              <ProgressBanner
+                onResumePublish={handleResumePublish}
+                onCancelPublish={clearPublishSession}
+              />
 
               {/* Review & Confirmation Step */}
               {matchedAlbums.length > 0 && (
@@ -447,23 +816,43 @@ export const App: React.FC = () => {
                   <TierPreviewCards />
 
                   <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-                    <button
-                      onClick={handleCommit}
-                      disabled={isCommitting}
-                      className="w-full sm:flex-1 py-3.5 px-6 rounded-full bg-spotify-green hover:bg-spotify-green-hover text-black font-bold text-sm shadow-md shadow-spotify-green/20 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
-                    >
-                      {isCommitting ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          <span>Publishing to Spotify...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send size={16} />
-                          <span>Add Selected to Playlist</span>
-                        </>
-                      )}
-                    </button>
+                    {publishSession?.isPaused ? (
+                      <button
+                        onClick={handleResumePublish}
+                        disabled={isCommitting}
+                        className="w-full sm:flex-1 py-3.5 px-6 rounded-full bg-spotify-green hover:bg-spotify-green-hover text-black font-bold text-sm shadow-md shadow-spotify-green/20 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+                      >
+                        {isCommitting ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>Resuming Publishing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play size={16} fill="currentColor" />
+                            <span>Resume Publishing to Spotify</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleCommit}
+                        disabled={isCommitting}
+                        className="w-full sm:flex-1 py-3.5 px-6 rounded-full bg-spotify-green hover:bg-spotify-green-hover text-black font-bold text-sm shadow-md shadow-spotify-green/20 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+                      >
+                        {isCommitting ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>Publishing to Spotify...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send size={16} />
+                            <span>Add Selected to Playlist</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={resetToSearch}
                       className="w-full sm:w-auto py-3 px-5 rounded-full bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition-all"
@@ -476,7 +865,8 @@ export const App: React.FC = () => {
               )}
 
               {/* Failed Items Resolution */}
-              <FailureSummary />
+              <FailureSummary onResumePublish={handleResumePublish} />
+
 
               {/* Live Status Console */}
               <StatusLog />

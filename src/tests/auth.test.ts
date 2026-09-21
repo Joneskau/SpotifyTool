@@ -54,13 +54,14 @@ describe('spotifyAuth resilience & transparency', () => {
   });
 
   describe('Spotify Scopes Transparency', () => {
-    it('defines 5 clear scopes with user-facing descriptions', () => {
-      expect(SPOTIFY_SCOPES.length).toBe(5);
+    it('defines 6 clear scopes with user-facing descriptions', () => {
+      expect(SPOTIFY_SCOPES.length).toBe(6);
       expect(SPOTIFY_SCOPES.map(s => s.scope)).toEqual([
         'playlist-read-private',
         'playlist-read-collaborative',
         'playlist-modify-public',
         'playlist-modify-private',
+        'ugc-image-upload',
         'user-read-private',
       ]);
     });
@@ -74,7 +75,7 @@ describe('spotifyAuth resilience & transparency', () => {
 
     it('builds a space-delimited SCOPES query parameter string', () => {
       expect(SCOPES).toBe(
-        'playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-read-private'
+        'playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private ugc-image-upload user-read-private'
       );
     });
   });
