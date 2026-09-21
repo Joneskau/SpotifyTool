@@ -89,7 +89,10 @@ export function getRedirectUri(): string {
   if (import.meta.env.VITE_SPOTIFY_REDIRECT_URI) {
     return import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
   }
-  return window.location.origin + window.location.pathname;
+  // Spotify strictly forbids 'localhost' in redirect URIs (enforced per April 2025 rules).
+  // We automatically convert localhost to loopback IP 127.0.0.1:
+  const origin = window.location.origin.replace('//localhost', '//127.0.0.1');
+  return origin + window.location.pathname;
 }
 
 function generateRandomString(length: number): string {
