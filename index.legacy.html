@@ -1,0 +1,3991 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Album to Playlist — Turn albums into Spotify playlists</title>
+
+    <!-- SEO -->
+    <meta name="description"
+        content="Paste a list of albums and instantly build smart Spotify playlists. Fuzzy album matching, popularity tiering, drag-to-reorder, and one-click publishing — all in your browser.">
+    <meta name="keywords"
+        content="Spotify, playlist, album, playlist builder, music, tiering, popularity, Spotify tools">
+    <meta name="author" content="Album to Playlist">
+    <meta name="robots" content="index, follow">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#1DB954">
+    <link rel="canonical" href="https://album-to-playlist.app/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Album to Playlist">
+    <meta property="og:title" content="Album to Playlist — Turn albums into Spotify playlists">
+    <meta property="og:description"
+        content="Paste a list of albums and instantly build smart Spotify playlists, right in your browser.">
+    <meta property="og:url" content="https://album-to-playlist.app/">
+    <meta property="og:image" content="https://album-to-playlist.app/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Album to Playlist — Turn albums into Spotify playlists">
+    <meta name="twitter:description"
+        content="Paste a list of albums and instantly build smart Spotify playlists, right in your browser.">
+    <meta name="twitter:image" content="https://album-to-playlist.app/og-image.png">
+
+    <!-- Favicon (inline, no external file needed) -->
+    <link rel="icon"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23191414'/%3E%3Cpath d='M62 24c-9 0-24 3-24 3v34.2A12 12 0 1 0 44 72V40s10-2 18-2z' fill='%231DB954'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23191414'/%3E%3Cpath d='M62 24c-9 0-24 3-24 3v34.2A12 12 0 1 0 44 72V40s10-2 18-2z' fill='%231DB954'/%3E%3C/svg%3E">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Album to Playlist">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --spotify-green: #1DB954;
+            --spotify-black: #191414;
+            --spotify-dark-gray: #282828;
+            --spotify-light-gray: #B3B3B3;
+            --spotify-white: #FFFFFF;
+
+            /* Theme-aware colors (dark mode default) */
+            --bg-primary: #121212;
+            --bg-secondary: rgba(40, 40, 40, 0.6);
+            --bg-tertiary: rgba(255, 255, 255, 0.1);
+            --text-primary: #FFFFFF;
+            --text-secondary: #B3B3B3;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --color-error: #ff6b6b;
+            --color-error-bg: rgba(255, 107, 107, 0.08);
+            --color-success: #1DB954;
+            --color-warning: #F59B23;
+        }
+
+        /* Light Theme */
+        [data-theme="light"] {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: rgba(255, 255, 255, 0.9);
+            --bg-tertiary: rgba(0, 0, 0, 0.05);
+            --text-primary: #191414;
+            --text-secondary: #535353;
+            --border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] body {
+            background: linear-gradient(-45deg, #e8f5e9, #f5f5f5, #e0f2f1, #f1f8e9);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .container {
+            background: #ffffff;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            border-color: var(--border-color);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            color: var(--text-primary);
+        }
+
+        /* Keep card copy readable in light mode (overrides inline light-gray text) */
+        [data-theme="light"] #auth-section p,
+        [data-theme="light"] #auth-section details {
+            color: var(--text-secondary) !important;
+        }
+
+        [data-theme="light"] .info-box strong,
+        [data-theme="light"] .info-box {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="light"] h1 {
+            color: var(--spotify-green);
+        }
+
+        [data-theme="light"] .subtitle,
+        [data-theme="light"] label {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="light"] input[type="text"],
+        [data-theme="light"] textarea,
+        [data-theme="light"] select {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="light"] .dropdown-options {
+            background: #ffffff;
+            border-color: var(--border-color);
+        }
+
+        [data-theme="light"] .dropdown-item:hover {
+            background: rgba(29, 185, 84, 0.1);
+        }
+
+        [data-theme="light"] .dropdown-item-name {
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .status-container,
+        [data-theme="light"] .info-box {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        [data-theme="light"] .preview-item {
+            background: var(--bg-tertiary);
+        }
+
+        [data-theme="light"] .toast {
+            background: #ffffff;
+            color: var(--text-primary);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 80px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            padding: 0;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        [data-theme="light"] .theme-toggle {
+            background: rgba(0, 0, 0, 0.05);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .theme-toggle:hover {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(-45deg, #121212, #191414, #000000, #1e3c2f);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: var(--spotify-white);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Noise Texture Overlay */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+        }
+
+        @keyframes gradientBG {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            background: rgba(40, 40, 40, 0.6);
+            /* Slightly more transparent */
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            /* Refined border */
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 20px rgba(255, 255, 255, 0.02);
+            /* Added subtle inner glow */
+            padding: 40px;
+            transition: all 0.3s ease;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        h1 {
+            color: var(--spotify-green);
+            margin-bottom: 10px;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            color: var(--spotify-light-gray);
+            margin-bottom: 30px;
+            font-weight: 400;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        /* Form Group & Sections */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-section {
+            background: linear-gradient(135deg, rgba(29, 185, 84, 0.08), rgba(29, 185, 84, 0.02));
+            border-left: 3px solid var(--spotify-green);
+            border: 1px solid rgba(29, 185, 84, 0.15);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .form-section:hover {
+            border-color: rgba(29, 185, 84, 0.25);
+            background: linear-gradient(135deg, rgba(29, 185, 84, 0.12), rgba(29, 185, 84, 0.05));
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--spotify-white);
+            font-size: 0.75rem;
+            /* Reduced font size for overline style */
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            /* Increased letter spacing */
+            opacity: 0.9;
+        }
+
+        .form-label-required {
+            color: var(--color-error);
+            margin-left: 4px;
+        }
+
+        .form-help {
+            font-size: 0.8rem;
+            color: var(--spotify-light-gray);
+            margin-top: 8px;
+            line-height: 1.5;
+            opacity: 0.85;
+        }
+
+        .form-help code {
+            background: rgba(29, 185, 84, 0.15);
+            color: var(--spotify-green);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid transparent;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--spotify-green);
+            box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.3);
+        }
+
+        select option {
+            background: var(--spotify-dark-gray);
+            color: white;
+        }
+
+        /* Editor Styles */
+        .editor-wrapper {
+            display: flex;
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid transparent;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            /* Ensure rounded corners */
+        }
+
+        .editor-wrapper:focus-within {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--spotify-green);
+            box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.3);
+        }
+
+        .editor-wrapper.invalid {
+            border-color: var(--color-error);
+            background: var(--color-error-bg);
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.15);
+        }
+
+        .line-numbers {
+            width: 40px;
+            background: rgba(0, 0, 0, 0.2);
+            color: var(--spotify-light-gray);
+            text-align: right;
+            padding: 14px 8px 14px 4px;
+            font-size: 14px;
+            font-family: inherit;
+            /* Match textarea */
+            line-height: 1.6;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            user-select: none;
+            overflow: hidden;
+            opacity: 0.6;
+        }
+
+        textarea {
+            min-height: 200px;
+            resize: vertical;
+            line-height: 1.6;
+            border: none;
+            /* Remove default border as wrapper handles it */
+            background: transparent;
+            /* Remove background as wrapper handles it */
+            white-space: pre;
+            /* Prevent wrapping for line number alignment */
+            overflow-x: auto;
+            /* Allow scrolling if lines are long */
+        }
+
+        textarea:focus {
+            box-shadow: none;
+            /* Remove default focus from textarea */
+            border-color: transparent;
+            background: transparent;
+        }
+
+        .validation-message {
+            font-size: 0.8rem;
+            margin-top: 8px;
+            min-height: 24px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            padding: 0;
+            color: var(--spotify-white);
+        }
+
+        .validation-message.visible {
+            opacity: 1;
+        }
+
+        .validation-message.error {
+            color: var(--color-error);
+        }
+
+        .validation-message.success {
+            color: var(--color-success);
+        }
+
+        .validation-icon {
+            flex-shrink: 0;
+            font-size: 0.95rem;
+            margin-top: 1px;
+            line-height: 1;
+        }
+
+        .validation-text {
+            flex: 1;
+            line-height: 1.4;
+        }
+
+        .validation-text strong {
+            font-weight: 600;
+        }
+
+        /* Enhanced Focus Indicators for Accessibility (WCAG 2.1 AA) */
+        :focus-visible {
+            outline: 3px solid var(--spotify-green);
+            outline-offset: 2px;
+        }
+
+        button:focus-visible {
+            outline: 3px solid var(--spotify-green);
+            outline-offset: 2px;
+        }
+
+        input:focus-visible,
+        textarea:focus-visible,
+        select:focus-visible {
+            outline: 3px solid var(--spotify-green);
+            outline-offset: 2px;
+        }
+
+        .dropdown-item:focus,
+        .dropdown-item:focus-visible,
+        .dropdown-item.focused {
+            outline: 2px solid var(--spotify-green);
+            outline-offset: -2px;
+            background: rgba(29, 185, 84, 0.2);
+        }
+
+        button {
+            background: var(--spotify-green);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 500px;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover {
+            background: #1ed760;
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(29, 185, 84, 0.4);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Status and Progress styles */
+        .status-container {
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .status-message {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-message.success {
+            background: rgba(29, 185, 84, 0.1);
+            border-left: 4px solid var(--spotify-green);
+        }
+
+        .status-message.error {
+            background: rgba(229, 9, 20, 0.1);
+            border-left: 4px solid #E50914;
+        }
+
+        .status-message.info {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid var(--spotify-light-gray);
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--spotify-green);
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--spotify-green);
+        }
+
+        /* Better loading state: Skeleton */
+        .skeleton {
+            animation: shimmer 1.5s infinite;
+            background: linear-gradient(90deg,
+                    rgba(255, 255, 255, 0.05) 0%,
+                    rgba(255, 255, 255, 0.15) 50%,
+                    rgba(255, 255, 255, 0.05) 100%);
+            background-size: 200% 100%;
+            border-radius: 4px;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: -200% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
+            }
+        }
+
+        /* Spinner for button */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, .3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Failed Album Item Styles */
+        .failed-item {
+            transition: all 0.2s ease;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+
+        .failed-item:hover {
+            background: rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .failed-item input:focus {
+            outline: none;
+            border-color: var(--spotify-green) !important;
+            box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
+        }
+
+        .failed-item button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .failed-item-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .failed-badge {
+            background: #E50914;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .failed-item-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .failed-item-actions button {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            width: auto;
+            white-space: nowrap;
+        }
+
+        .failed-item-actions .btn-retry {
+            background: var(--spotify-green);
+        }
+
+        .failed-item-actions .btn-remove {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .failed-item-actions .btn-remove:hover {
+            background: rgba(229, 9, 20, 0.3);
+            border-color: #E50914;
+        }
+
+        .failed-item-actions select {
+            flex: 1;
+            min-width: 150px;
+            padding: 6px 8px;
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: var(--spotify-light-gray);
+        }
+
+        [data-theme="light"] .failed-item {
+            background: rgba(229, 9, 20, 0.05);
+        }
+
+        [data-theme="light"] .failed-item-actions .btn-remove {
+            background: rgba(0, 0, 0, 0.05);
+            border-color: rgba(0, 0, 0, 0.1);
+            color: var(--text-primary);
+        }
+
+        /* Utilities */
+        .hidden {
+            display: none !important;
+        }
+
+        .info-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid var(--spotify-green);
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            color: var(--spotify-light-gray);
+            line-height: 1.6;
+        }
+
+        .info-box code {
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--spotify-green);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+
+        /* Site Footer */
+        .site-footer {
+            max-width: 800px;
+            width: 100%;
+            margin: 24px auto 0;
+            padding: 24px 8px 8px;
+            color: var(--spotify-light-gray);
+            font-size: 0.8rem;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .site-footer .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px 20px;
+            margin-bottom: 14px;
+        }
+
+        .site-footer a {
+            color: var(--spotify-light-gray);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .site-footer a:hover,
+        .site-footer a:focus-visible {
+            color: var(--spotify-green);
+            text-decoration: underline;
+        }
+
+        .site-footer .footer-disclaimer {
+            max-width: 620px;
+            margin: 0 auto 10px;
+            opacity: 0.75;
+        }
+
+        .site-footer .footer-copy {
+            opacity: 0.6;
+        }
+
+        [data-theme="light"] .site-footer,
+        [data-theme="light"] .site-footer a {
+            color: var(--text-secondary);
+        }
+
+        /* Footer detail panels (Privacy / How it works) */
+        .footer-details {
+            max-width: 620px;
+            margin: 0 auto 16px;
+            text-align: left;
+        }
+
+        .footer-details summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--spotify-white);
+            list-style: none;
+            padding: 8px 0;
+        }
+
+        .footer-details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .footer-details summary::before {
+            content: "\25B8";
+            display: inline-block;
+            margin-right: 8px;
+            color: var(--spotify-green);
+            transition: transform 0.2s ease;
+        }
+
+        .footer-details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        [data-theme="light"] .footer-details summary {
+            color: var(--text-primary);
+        }
+
+        /* NoScript banner */
+        .noscript-banner {
+            max-width: 800px;
+            margin: 0 auto 20px;
+            padding: 16px 20px;
+            background: rgba(245, 155, 35, 0.12);
+            border: 1px solid var(--color-warning);
+            border-radius: 8px;
+            color: #ffd8a8;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        /* Reduced motion: disable ambient animation for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+            }
+
+            body {
+                animation: none !important;
+            }
+        }
+
+        /* Mobile refinements for a published site */
+        @media (max-width: 600px) {
+            body {
+                padding: 12px;
+            }
+
+            .container {
+                padding: 56px 18px 24px;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+
+            .theme-toggle {
+                top: 12px;
+                right: 64px;
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 30px var(--spotify-green);
+            }
+        }
+
+        /* Success animation */
+        @keyframes successPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(29, 185, 84, 0.7);
+            }
+
+            50% {
+                box-shadow: 0 0 0 15px rgba(29, 185, 84, 0);
+            }
+        }
+
+        .success-pulse {
+            animation: successPulse 1s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Drag and Drop Styles */
+        .preview-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: grab;
+            border: 1px solid transparent;
+            transition: background 0.2s, transform 0.1s;
+            user-select: none;
+        }
+
+        .preview-item:active {
+            cursor: grabbing;
+        }
+
+        .preview-item.dragging {
+            opacity: 0.4;
+            transform: scale(0.98);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px dashed var(--spotify-light-gray);
+            box-shadow: 0 8px 24px rgba(29, 185, 84, 0.4);
+        }
+
+        .preview-item:hover:not(.dragging) {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(29, 185, 84, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .preview-item img {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .drag-handle {
+            color: var(--spotify-light-gray);
+            cursor: grab;
+            font-size: 1.2rem;
+            padding: 0 5px;
+        }
+
+        input[type="checkbox"] {
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="checkbox"]:hover {
+            transform: scale(1.1);
+        }
+
+        /* User Profile Badge */
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .user-badge:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .user-badge img {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .user-badge span {
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Toast Notification System */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 350px;
+        }
+
+        .toast {
+            background: var(--spotify-dark-gray);
+            border-radius: 8px;
+            padding: 14px 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 4.7s forwards;
+            border-left: 4px solid var(--spotify-light-gray);
+            color: white;
+        }
+
+        .toast.success {
+            border-left-color: var(--spotify-green);
+        }
+
+        .toast.error {
+            border-left-color: #E50914;
+        }
+
+        .toast.info {
+            border-left-color: #3498db;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: var(--spotify-light-gray);
+            cursor: pointer;
+            margin-left: auto;
+            padding: 4px;
+            font-size: 1.2rem;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .toast-close:hover {
+            color: white;
+        }
+
+        /* Skeleton Loading system */
+        .skeleton {
+            background: linear-gradient(90deg,
+                    rgba(255, 255, 255, 0.05) 25%,
+                    rgba(255, 255, 255, 0.1) 50%,
+                    rgba(255, 255, 255, 0.05) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        .skeleton-option {
+            height: 40px;
+            margin-bottom: 8px;
+        }
+
+        .skeleton-text {
+            height: 14px;
+            width: 60%;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin-top: 15px;
+        }
+
+        /* Custom Searchable Dropdown */
+        .custom-dropdown {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            /* Match the flex: 1 of the original select */
+        }
+
+        .dropdown-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .dropdown-input-wrapper input {
+            padding-right: 40px;
+            /* Space for arrow */
+            cursor: text;
+        }
+
+        .dropdown-arrow {
+            position: absolute;
+            right: 15px;
+            pointer-events: none;
+            color: var(--spotify-light-gray);
+            font-size: 0.8rem;
+            transition: transform 0.3s;
+        }
+
+        .custom-dropdown.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-options {
+            position: absolute;
+            top: 110%;
+            left: 0;
+            width: 100%;
+            background: #282828;
+            /* Matches var(--spotify-dark-gray) but opaque */
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            display: none;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .custom-dropdown.open .dropdown-options {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover,
+        .dropdown-item.selected {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .dropdown-item img {
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            object-fit: cover;
+            background: #333;
+        }
+
+        .dropdown-item-content {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .dropdown-item-name {
+            color: var(--spotify-white);
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .dropdown-item-tracks {
+            font-size: 0.75rem;
+            color: var(--spotify-light-gray);
+        }
+
+        /* NEW Playlist Item Special Style */
+        .dropdown-item.new-playlist {
+            color: var(--spotify-green);
+            font-weight: 600;
+            justify-content: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+            padding: 15px;
+        }
+
+        /* Grid View Implementation */
+        #preview-list {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #preview-list.grid-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        #preview-list.grid-view .preview-item {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 15px;
+            position: relative;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        #preview-list.grid-view .preview-item img {
+            width: 120px !important;
+            height: 120px !important;
+            margin-bottom: 12px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        #preview-list.grid-view .preview-item input[type="checkbox"] {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 2;
+            width: 24px !important;
+            height: 24px !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        #preview-list.grid-view .preview-item .drag-handle {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #preview-list.grid-view .preview-item-details {
+            width: 100%;
+        }
+
+        #preview-list.grid-view select {
+            width: 100% !important;
+            margin-top: 8px;
+        }
+
+        /* View Toggles */
+        .view-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .view-toggle {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 3px;
+        }
+
+        .view-toggle-btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            color: var(--spotify-light-gray);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            width: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .view-toggle-btn:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .view-toggle-btn.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Confidence Borders */
+        .confidence-high {
+            border: 1px solid #1DB954 !important;
+            box-shadow: inset 0 0 15px rgba(29, 185, 84, 0.1);
+        }
+
+        .confidence-medium {
+            border: 1px solid #F59B23 !important;
+            box-shadow: inset 0 0 15px rgba(245, 155, 35, 0.1);
+        }
+
+        .confidence-low {
+            border: 1px solid #E50914 !important;
+            box-shadow: inset 0 0 15px rgba(229, 9, 20, 0.1);
+        }
+
+        .match-score {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .score-high {
+            color: #1DB954;
+            background: rgba(29, 185, 84, 0.1);
+        }
+
+        .score-medium {
+            color: #F59B23;
+            background: rgba(245, 155, 35, 0.1);
+        }
+
+        .score-low {
+            color: #E50914;
+            background: rgba(229, 9, 20, 0.1);
+        }
+
+        /* Tier Preview Styles */
+        .tier-preview {
+            background: linear-gradient(135deg, rgba(29, 185, 84, 0.1), rgba(29, 185, 84, 0.02));
+            border: 1px solid rgba(29, 185, 84, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tier-preview-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tier-preview-icon {
+            font-size: 1.3rem;
+        }
+
+        .tier-preview-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--spotify-green);
+        }
+
+        .tier-preview-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tier-playlist-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 12px 16px;
+            flex: 1 1 calc(50% - 5px);
+            min-width: 180px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .tier-playlist-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(29, 185, 84, 0.3);
+        }
+
+        .tier-playlist-card.primary {
+            border-color: var(--spotify-green);
+            background: rgba(29, 185, 84, 0.15);
+        }
+
+        .tier-playlist-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--spotify-white);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tier-playlist-stats {
+            font-size: 0.8rem;
+            color: var(--spotify-light-gray);
+        }
+
+        .tier-playlist-stats .track-count {
+            color: var(--spotify-green);
+            font-weight: 600;
+        }
+
+        .tier-summary {
+            width: 100%;
+            margin-top: 8px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.85rem;
+            color: var(--spotify-light-gray);
+            text-align: center;
+        }
+
+        .tier-summary strong {
+            color: var(--spotify-green);
+        }
+
+        /* Tier Options UI */
+        .tier-controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: start;
+        }
+
+        .tier-controls-grid .form-group {
+            margin-bottom: 0;
+        }
+    </style>
+    <script>
+        // Apply saved/system theme before first paint to avoid a flash of the
+        // wrong theme and to prevent the entry animation from restarting on load.
+        (function () {
+            try {
+                var saved = localStorage.getItem('theme');
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var theme = saved || (prefersDark ? 'dark' : 'light');
+                if (theme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) { /* localStorage unavailable */ }
+        })();
+    </script>
+</head>
+
+<body>
+    <!-- Theme Toggle -->
+    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark/light theme">
+        <span class="theme-icon" aria-hidden="true">🌙</span>
+    </button>
+
+    <noscript>
+        <div class="noscript-banner">
+            This tool runs entirely in your browser and needs JavaScript to talk to Spotify.
+            Please enable JavaScript to continue.
+        </div>
+    </noscript>
+
+    <div class="container">
+        <h1>🎵 Spotify Album to Playlist</h1>
+        <p class="subtitle">Add albums to your Spotify playlists automatically</p>
+
+        <div id="auth-section">
+            <button onclick="authenticateSpotify()">Connect to Spotify</button>
+            <p style="margin-top: 12px; font-size: 0.8rem; color: var(--spotify-light-gray); opacity: 0.8;">
+                We only request permission to read and edit your playlists. Your account stays
+                in your browser &mdash; nothing is sent to our servers.
+            </p>
+            <div class="info-box" style="margin-top: 20px;">
+                <strong>How it works:</strong><br>
+                1. Connect your Spotify account<br>
+                2. Paste your album list (one per line in format: <code>Artist - Album</code>)<br>
+                3. Review the matches and pick a tiering strategy<br>
+                4. Publish straight to a new or existing Spotify playlist
+            </div>
+            <details style="margin-top: 15px; font-size: 12px; color: var(--spotify-light-gray);">
+                <summary style="cursor: pointer;">Deploying this yourself?</summary>
+                <div style="margin-top: 8px; line-height: 1.6;">
+                    Add this Redirect URI to your app in the Spotify Developer Dashboard:<br>
+                    <code id="redirect-uri-display"
+                        style="background: rgba(0,0,0,0.3); color: var(--spotify-green); padding: 4px 6px; border-radius: 4px; user-select: all; display: inline-block; margin-top: 5px;"></code>
+                </div>
+            </details>
+        </div>
+
+        <!-- User Badge -->
+        <div id="user-badge" class="user-badge hidden">
+            <img id="user-avatar" src="" alt="User Avatar">
+            <span id="user-name">Loading...</span>
+        </div>
+
+        <!-- Logout Button (Absolute positioned top right) -->
+        <button id="logout-btn" onclick="logout()" class="hidden"
+            style="position: absolute; top: 20px; right: 20px; width: auto; padding: 8px 16px; font-size: 12px; background: #333;">Disconnect</button>
+
+        <div id="main-section" class="hidden">
+            <div class="progress-wrapper" id="progress-wrapper" style="display: none; margin: 20px 0;">
+                <div
+                    style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: var(--spotify-white);">
+                    <span id="progress-label">Processing...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progress-fill"></div>
+                </div>
+                <div id="progress-eta"
+                    style="text-align: right; font-size: 0.75rem; color: var(--spotify-light-gray); margin-top: 5px;">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="playlist-search-input" id="playlist-label">Select Target Playlist</label>
+                    <div class="custom-dropdown" id="playlist-dropdown" role="combobox" aria-expanded="false"
+                        aria-haspopup="listbox" aria-labelledby="playlist-label">
+                        <div class="dropdown-input-wrapper">
+                            <input type="text" id="playlist-search-input" placeholder="Search my playlists..."
+                                autocomplete="off" aria-label="Search playlists" aria-autocomplete="list"
+                                aria-controls="playlist-options">
+                            <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                        </div>
+                        <!-- Hidden input to maintain ID for existing logic -->
+                        <input type="hidden" id="playlist-select">
+                        <div class="dropdown-options" id="playlist-options" role="listbox"
+                            aria-label="Playlist options"></div>
+                    </div>
+                </div>
+
+                <div id="new-playlist-container" class="hidden form-group" style="margin-top: 15px;">
+                    <label for="new-playlist-name">New Playlist Name</label>
+                    <input type="text" id="new-playlist-name" placeholder="e.g. My Awesome New Playlist"
+                        oninput="debouncedTierPreview()">
+                    <p class="form-help">Type a name for the new playlist that will be created on Spotify.</p>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="album-list">
+                        Album List
+                        <span class="form-label-required" aria-label="required">*</span>
+                    </label>
+
+                    <p class="form-help" id="album-help">
+                        Enter one album per line in the format: <code>Artist Name - Album Title</code>
+                        <br>Examples: <em>"The Beatles - Abbey Road"</em> or <em>"Kendrick Lamar - To Pimp a
+                            Butterfly"</em>
+                    </p>
+
+                    <div class="editor-wrapper" id="editor-wrapper">
+                        <div class="line-numbers" id="line-numbers" aria-hidden="true">1</div>
+                        <textarea id="album-list" spellcheck="false" aria-describedby="album-help album-validation"
+                            aria-label="Album list input - enter one album per line in format: Artist - Album"
+                            placeholder="The Beatles - Abbey Road&#10;Pink Floyd - The Wall&#10;Daft Punk - Discovery"></textarea>
+                    </div>
+
+                    <!-- Structured Validation Message -->
+                    <div id="album-validation" class="validation-message" role="alert" aria-live="polite"
+                        aria-atomic="true">
+                        <span class="validation-icon">✓</span>
+                        <div class="validation-text">
+                            <span id="validation-text">Ready to process</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;" id="action-btns">
+                <button onclick="processAlbums()" id="process-btn">Search & Preview Albums</button>
+                <button onclick="cancelProcessing()" id="cancel-btn" class="hidden"
+                    style="background: #e50914; width: auto; flex-shrink: 0;">Cancel</button>
+            </div>
+
+            <div id="confirmation-section" class="hidden"
+                style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 25px;">
+
+                <div class="view-controls">
+                    <div>
+                        <h2 style="font-size: 1.2rem; margin-bottom: 5px; color: var(--spotify-green);">Confirm Matches
+                        </h2>
+                        <p style="font-size: 0.85rem; color: var(--spotify-light-gray);">ℹ️ Drag to reorder. Check
+                            borders for confidence.</p>
+                    </div>
+                    <div class="view-toggle">
+                        <button class="view-toggle-btn active" id="btn-list-view" onclick="toggleView('list')"
+                            title="List View">
+                            <span>☰</span> List
+                        </button>
+                        <button class="view-toggle-btn" id="btn-grid-view" onclick="toggleView('grid')"
+                            title="Grid View">
+                            <span>⊞</span> Grid
+                        </button>
+                    </div>
+                </div>
+                <div id="preview-list" style="margin-bottom: 20px;"></div>
+
+                <!-- Tiering Options Section -->
+                <div id="tiering-options" class="form-section">
+                    <div
+                        style="font-weight: 600; margin-bottom: 15px; color: var(--spotify-green); display: flex; align-items: center; gap: 8px;">
+                        <span>⚙️ Tiering Strategy</span>
+                    </div>
+
+                    <div class="tier-controls-grid">
+                        <!-- Strategy -->
+                        <div class="form-group">
+                            <label for="tier-strategy">Strategy</label>
+                            <select id="tier-strategy" onchange="updateTieringUI(); debouncedTierPreview()">
+                                <option value="halving">Popularity Halving</option>
+                                <option value="partitioning">Partitioning (No Repeats)</option>
+                                <option value="top_n">Top N per Album</option>
+                                <option value="time_bounded">Time-bounded</option>
+                            </select>
+                            <p class="form-help" id="strategy-desc" style="font-size: 0.75rem; min-height: 2.4em;">
+                                Nested: Top 100%, 50%, 25%...</p>
+                        </div>
+
+                        <!-- Dynamic Parameter -->
+                        <div class="form-group">
+                            <label id="tier-param-label" style="color: var(--spotify-light-gray);">N / A</label>
+                            <input type="number" id="tier-param-input" class="disabled" disabled placeholder="-" min="1"
+                                oninput="debouncedTierPreview()">
+                        </div>
+
+                        <!-- Tier Mode (Top N only) -->
+                        <div class="form-group hidden" id="tier-mode-group">
+                            <label>Mode</label>
+                            <select id="tier-mode-select" onchange="debouncedTierPreview()"
+                                style="padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid #444;">
+                                <option value="single">Single Playlist</option>
+                                <option value="multi">Multi-tier (Recursive)</option>
+                            </select>
+                        </div>
+
+                        <!-- Constraints -->
+                        <div class="form-group">
+                            <label for="max-playlists">Max Playlists</label>
+                            <input type="number" id="max-playlists" placeholder="Unlimited" min="1"
+                                oninput="debouncedTierPreview()">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max-tracks">Max Tracks / Playlist</label>
+                            <input type="number" id="max-tracks" placeholder="Unlimited" min="1"
+                                oninput="debouncedTierPreview()">
+                        </div>
+                    </div>
+
+                    <!-- Constraint Warnings -->
+                    <div id="constraint-warning" class="hidden"
+                        style="margin-top: 10px; padding: 8px; border-radius: 4px; background: rgba(245, 155, 35, 0.1); border: 1px solid #F59B23; color: #F59B23; font-size: 0.8rem;">
+                    </div>
+                    <div id="constraint-error" class="hidden"
+                        style="margin-top: 10px; padding: 8px; border-radius: 4px; background: rgba(229, 9, 20, 0.1); border: 1px solid #E50914; color: #E50914; font-size: 0.8rem;">
+                    </div>
+                </div>
+
+                <!-- Tier Preview Section -->
+                <div id="tier-preview" class="tier-preview hidden">
+                    <div class="tier-preview-header">
+                        <span class="tier-preview-icon">📊</span>
+                        <span class="tier-preview-title">Playlist Preview</span>
+                    </div>
+                    <div id="tier-preview-content" class="tier-preview-content"></div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="commitSelection()" id="commit-btn" style="flex: 1;">Add Selected to
+                        Playlist</button>
+                    <button onclick="resetToSearch()" style="background: #333; width: auto;">Edit List</button>
+                </div>
+            </div>
+
+            <div id="empty-state" class="empty-state">
+                <div style="font-size: 4rem; margin-bottom: 15px; opacity: 0.5;">📝</div>
+                <h3 style="margin-bottom: 10px; font-size: 1.1rem;">No albums yet</h3>
+                <p style="color: var(--spotify-light-gray); font-size: 0.9rem; max-width: 300px; margin: 0 auto;">
+                    Paste your album list above in the format:<br>
+                    <code
+                        style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; margin-top: 8px; display: inline-block;">Artist - Album</code>
+                </p>
+            </div>
+
+            <div id="status-area" class="status-container hidden" role="log" aria-live="polite"
+                aria-label="Processing status"></div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <details class="footer-details">
+            <summary>How it works</summary>
+            <p>Album to Playlist searches Spotify for each album you list, lets you confirm the right
+                edition, and then arranges the tracks into one or more playlists using the tiering
+                strategy you choose (popularity halving, partitioning, top-N, or time-bounded). It
+                de-duplicates against tracks already in your target playlist so re-running is safe.</p>
+        </details>
+        <details class="footer-details">
+            <summary>Privacy</summary>
+            <p>This is a client-side app. Authentication uses Spotify&rsquo;s official OAuth (PKCE) flow,
+                and your access token is kept only in your browser&rsquo;s local storage. We don&rsquo;t run a
+                backend, we don&rsquo;t store your data, and we never see your Spotify credentials. Use the
+                <em>Disconnect</em> button to clear your session at any time.</p>
+        </details>
+
+        <nav class="footer-links" aria-label="Footer">
+            <a href="#" onclick="document.querySelector('.footer-details').open = true; return false;">How it works</a>
+            <a href="https://www.spotify.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer">Spotify Privacy</a>
+            <a href="https://developer.spotify.com/terms" target="_blank" rel="noopener noreferrer">Spotify Terms</a>
+            <a href="mailto:hello@album-to-playlist.app">Contact</a>
+        </nav>
+
+        <p class="footer-disclaimer">
+            Not affiliated with, endorsed, or sponsored by Spotify AB. &ldquo;Spotify&rdquo; and the
+            Spotify logo are trademarks of Spotify AB. This tool uses the Spotify Web API but is an
+            independent project.
+        </p>
+        <p class="footer-copy">&copy; <span id="footer-year">2026</span> Album to Playlist. Made for music lovers.</p>
+    </footer>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        const CLIENT_ID = '4de24b8ba1194ceab1f9b87226582f04';
+        const REDIRECT_URI = 'http://127.0.0.1:5500/index.html';
+        const SCOPES = 'playlist-modify-public playlist-modify-private playlist-read-private user-read-private';
+
+        let accessToken = null;
+        let playlists = [];
+        let isCancelled = false;
+        let matchedAlbums = []; // Store results for confirmation
+        let targetPlaylistId = null; // Store the ID for commitSelection
+        let refreshToken = null;
+        let existingTrackUris = new Set(); // Tracks already in the playlist
+        let failedAlbums = []; // TRACK FAILED SEARCHES
+
+        // Rate Limiter Helper
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Theme Toggle
+        function initTheme() {
+            const toggle = document.getElementById('theme-toggle');
+            const icon = toggle.querySelector('.theme-icon');
+
+            // Check for saved theme or system preference
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+
+            // Apply initial theme
+            if (theme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                icon.textContent = '☀️';
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                icon.textContent = '🌙';
+            }
+
+            // Toggle handler
+            toggle.addEventListener('click', () => {
+                const isDark = !document.documentElement.hasAttribute('data-theme');
+
+                if (isDark) {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    icon.textContent = '☀️';
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                    icon.textContent = '🌙';
+                    localStorage.setItem('theme', 'dark');
+                }
+            });
+        }
+
+        async function fetchWithRateLimit(url, options = {}, retries = 3) {
+            try {
+                const response = await fetch(url, options);
+
+                if (response.status === 429) {
+                    const retryAfter = response.headers.get('Retry-After');
+                    const waitTime = retryAfter ? (parseInt(retryAfter) * 1000) + 1000 : 2000; // Default 2s if header missing
+
+                    if (retries > 0) {
+                        addStatusMessage(`⏳ Rate limited. Waiting ${waitTime / 1000}s...`, 'info');
+                        await delay(waitTime);
+                        return fetchWithRateLimit(url, options, retries - 1);
+                    }
+
+                    addStatusMessage('❌ Rate limit exceeded. Please try again later.', 'error');
+                    return null;
+                }
+
+                if (response.status === 401) {
+                    // Try refreshing
+                    const refreshed = await refreshAccessToken();
+                    if (refreshed) {
+                        // Retry original request with new token
+                        options.headers = options.headers || {};
+                        options.headers['Authorization'] = `Bearer ${accessToken}`;
+                        return fetchWithRateLimit(url, options, retries);
+                    }
+                    addStatusMessage('Session expired. Please reconnect.', 'error');
+                    logout();
+                    return null;
+                }
+
+                return response;
+            } catch (error) {
+                if (retries > 0) {
+                    await delay(1000);
+                    return fetchWithRateLimit(url, options, retries - 1);
+                }
+                throw error;
+            }
+        }
+
+
+        // --- PKCE Helpers ---
+        function generateRandomString(length) {
+            const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            const values = crypto.getRandomValues(new Uint8Array(length));
+            return Array.from(values).map((x) => possible[x % possible.length]).join('');
+        }
+
+        async function sha256(plain) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(plain);
+            return window.crypto.subtle.digest('SHA-256', data);
+        }
+
+        function base64encode(input) {
+            return btoa(String.fromCharCode(...new Uint8Array(input)))
+                .replace(/=/g, '')
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_');
+        }
+
+        async function generateCodeChallenge(codeVerifier) {
+            const hashed = await sha256(codeVerifier);
+            return base64encode(hashed);
+        }
+        // --- End PKCE Helpers ---
+
+        // Check for access token or auth code in URL
+        window.addEventListener('load', async () => {
+            document.getElementById('redirect-uri-display').textContent = REDIRECT_URI;
+
+            // Initialize theme
+            initTheme();
+
+
+            // Restore album list
+            restoreAlbumList();
+            setupEditor(); // Initialize line numbers, validation, placeholder
+            setupDropdown(); // Initialize custom dropdown
+            updateTieringUI(); // Initialize tiering UI state
+            document.getElementById('album-list').addEventListener('input', saveAlbumList);
+
+            // Add listener for playlist persistence
+            document.getElementById('playlist-select').addEventListener('change', (e) => {
+                localStorage.setItem('spotify_last_playlist', e.target.value);
+            });
+
+            // Check if we have a stored token
+            const storedToken = window.localStorage.getItem('spotify_access_token');
+            const storedExpiry = window.localStorage.getItem('spotify_token_expiry');
+            const storedRefresh = window.localStorage.getItem('spotify_refresh_token');
+
+            if (storedToken && storedExpiry) {
+                if (Date.now() < parseInt(storedExpiry)) {
+                    accessToken = storedToken;
+                    onAuthenticated();
+                    return;
+                } else if (storedRefresh) {
+                    // Token expired, attempt refresh
+                    const refreshed = await refreshAccessToken();
+                    if (refreshed) {
+                        onAuthenticated();
+                        return;
+                    }
+                }
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+
+            if (code) {
+                // We have a code, exchange it for a token
+                await exchangeCodeForToken(code);
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        });
+
+        function logout() {
+            window.localStorage.removeItem('spotify_access_token');
+            window.localStorage.removeItem('spotify_token_expiry');
+            window.localStorage.removeItem('spotify_refresh_token');
+            location.reload();
+        }
+
+        async function authenticateSpotify() {
+            const codeVerifier = generateRandomString(64);
+            const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+            // Store verifier locally for the callback
+            window.localStorage.setItem('code_verifier', codeVerifier);
+
+            const params = {
+                response_type: 'code',
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                code_challenge_method: 'S256',
+                code_challenge: codeChallenge,
+                redirect_uri: REDIRECT_URI,
+            };
+
+            const authUrl = new URL("https://accounts.spotify.com/authorize");
+            authUrl.search = new URLSearchParams(params).toString();
+            window.location.href = authUrl.toString();
+        }
+
+        async function exchangeCodeForToken(code) {
+            const codeVerifier = window.localStorage.getItem('code_verifier');
+
+            const params = {
+                client_id: CLIENT_ID,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: REDIRECT_URI,
+                code_verifier: codeVerifier,
+            };
+
+            try {
+                showStatus('Exchanging code for token...', 'info');
+                const response = await fetch('https://accounts.spotify.com/api/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams(params),
+                });
+
+                const data = await response.json();
+                if (data.access_token) {
+                    accessToken = data.access_token;
+                    // Store tokens
+                    window.localStorage.setItem('spotify_access_token', accessToken);
+                    window.localStorage.setItem('spotify_token_expiry', Date.now() + (data.expires_in * 1000));
+                    if (data.refresh_token) {
+                        window.localStorage.setItem('spotify_refresh_token', data.refresh_token);
+                    }
+                    onAuthenticated();
+                } else {
+                    throw new Error(data.error_description || 'Failed to get access token');
+                }
+            } catch (error) {
+                showStatus(`Auth Error: ${error.message}`, 'error');
+            }
+        }
+
+        // --- Editor Enhancements ---
+
+        function setupEditor() {
+            const textarea = document.getElementById('album-list');
+            const lineNumbers = document.getElementById('line-numbers');
+            const editorWrapper = document.getElementById('editor-wrapper');
+            const validationContainer = document.getElementById('album-validation');
+            const validationText = document.getElementById('validation-text');
+            const validationIcon = validationContainer.querySelector('.validation-icon');
+
+            // 1. Line Numbers Sync
+            const updateLineNumbers = () => {
+                const lines = textarea.value.split('\n').length;
+                lineNumbers.innerHTML = Array(lines).fill(0)
+                    .map((_, i) => i + 1)
+                    .join('<br>');
+            };
+
+            const syncScroll = () => {
+                lineNumbers.scrollTop = textarea.scrollTop;
+            };
+
+            textarea.addEventListener('input', updateLineNumbers);
+            textarea.addEventListener('scroll', syncScroll);
+            textarea.addEventListener('mouseup', syncScroll);
+            updateLineNumbers();
+
+            // 2. Real-time Format Validation (IMPROVED)
+            let typingTimer;
+            const doneTypingInterval = 800;
+
+            const validateInput = () => {
+                const lines = textarea.value.split('\n');
+                let hasError = false;
+                let errorLineNum = -1;
+                let errorMessage = '';
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+
+                    // Skip empty lines
+                    if (line.length === 0) continue;
+
+                    const parsed = parseAlbumLine(line);
+                    if (parsed.error) {
+                        hasError = true;
+                        errorLineNum = i + 1;
+                        errorMessage = `Line ${errorLineNum}: ${parsed.error}`;
+                        break;
+                    }
+                }
+
+                // Update UI
+                if (hasError) {
+                    editorWrapper.classList.add('invalid');
+                    validationContainer.classList.add('visible');
+                    validationContainer.classList.remove('success');
+                    validationContainer.classList.add('error');
+                    validationIcon.textContent = '⚠️';
+                    validationText.textContent = errorMessage;
+                } else if (textarea.value.trim().length > 0) {
+                    editorWrapper.classList.remove('invalid');
+                    validationContainer.classList.add('visible');
+                    validationContainer.classList.remove('error');
+                    validationContainer.classList.add('success');
+                    validationIcon.textContent = '✓';
+                    validationText.textContent = 'All lines are formatted correctly!';
+                } else {
+                    editorWrapper.classList.remove('invalid');
+                    validationContainer.classList.add('visible');
+                    validationContainer.classList.remove('error', 'success');
+                    validationIcon.textContent = '✓';
+                    validationText.textContent = 'Ready to process';
+                }
+            };
+
+            textarea.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                editorWrapper.classList.remove('invalid');
+
+                if (textarea.value.trim().length > 0) {
+                    typingTimer = setTimeout(validateInput, doneTypingInterval);
+                } else {
+                    validationContainer.classList.remove('visible');
+                }
+            });
+
+            // 3. Placeholder Rotation
+            const placeholders = [
+                "The Beatles - Abbey Road\nPink Floyd - The Wall",
+                "Kendrick Lamar - To Pimp a Butterfly\nJames Blake - Overgrown",
+                "Fleetwood Mac - Rumours\nTom Misch - Geography",
+                "Frank Ocean - Blonde\nA$AP Rocky - At Long Last A$AP"
+            ];
+            let placeholderIdx = 0;
+
+            const rotatePlaceholder = () => {
+                if (textarea === document.activeElement && textarea.value.length > 0) return;
+                textarea.setAttribute('placeholder', placeholders[placeholderIdx]);
+                placeholderIdx = (placeholderIdx + 1) % placeholders.length;
+            };
+
+            rotatePlaceholder();
+            setInterval(rotatePlaceholder, 4000);
+
+            // Validate on blur for accessibility
+            textarea.addEventListener('blur', () => {
+                if (textarea.value.trim().length > 0) {
+                    validateInput();
+                }
+            });
+        }
+
+        async function refreshAccessToken() {
+            const storedRefresh = window.localStorage.getItem('spotify_refresh_token');
+            if (!storedRefresh) return false;
+
+            const params = {
+                client_id: CLIENT_ID,
+                grant_type: 'refresh_token',
+                refresh_token: storedRefresh,
+            };
+
+            try {
+                const response = await fetch('https://accounts.spotify.com/api/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams(params),
+                });
+
+                const data = await response.json();
+                if (data.access_token) {
+                    accessToken = data.access_token;
+                    window.localStorage.setItem('spotify_access_token', accessToken);
+                    window.localStorage.setItem('spotify_token_expiry', Date.now() + (data.expires_in * 1000));
+                    if (data.refresh_token) {
+                        window.localStorage.setItem('spotify_refresh_token', data.refresh_token);
+                    }
+                    return true;
+                }
+            } catch (error) {
+                console.error('Refresh error:', error);
+            }
+            return false;
+        }
+
+        async function onAuthenticated() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('main-section').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+            document.getElementById('user-badge').classList.remove('hidden');
+
+            await loadUserProfile();
+            await loadPlaylists();
+        }
+
+        async function loadUserProfile() {
+            try {
+                const response = await fetchWithRateLimit('https://api.spotify.com/v1/me', {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!response) return;
+                const data = await response.json();
+
+                if (data.display_name) {
+                    document.getElementById('user-name').textContent = data.display_name;
+                    const avatarUrl = data.images && data.images.length > 0 ? data.images[0].url : 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y';
+                    document.getElementById('user-avatar').src = avatarUrl;
+                }
+            } catch (error) {
+                console.error('Error loading user profile:', error);
+            }
+        }
+
+        async function loadPlaylists() {
+            const searchInput = document.getElementById('playlist-search-input');
+
+            // Show loading state
+            renderSkeletonPlaylists();
+            searchInput.disabled = true;
+
+            try {
+                showStatus('Loading your playlists...', 'info');
+                playlists = [];
+                let nextUrl = 'https://api.spotify.com/v1/me/playlists?limit=50';
+
+                while (nextUrl) {
+                    const response = await fetchWithRateLimit(nextUrl, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    if (!response) {
+                        throw new Error('Session expired or API error');
+                    }
+                    const data = await response.json();
+                    if (data.items) {
+                        playlists.push(...data.items);
+                    }
+                    nextUrl = data.next;
+                }
+
+                searchInput.value = "";
+                searchInput.disabled = false;
+                searchInput.placeholder = "Search playlists...";
+
+                renderPlaylistOptions();
+
+                // Restore last selected playlist
+                const lastPlaylist = localStorage.getItem('spotify_last_playlist');
+                if (lastPlaylist) {
+                    if (lastPlaylist === 'NEW') {
+                        selectPlaylist('NEW', '✨ Create New Playlist');
+                    } else {
+                        const found = playlists.find(p => p.id === lastPlaylist);
+                        if (found) {
+                            selectPlaylist(found.id, found.name);
+                        }
+                    }
+                }
+
+                clearStatus();
+            } catch (error) {
+                showStatus(`Error loading playlists: ${error.message}`, 'error');
+                searchInput.value = "Error loading";
+            }
+        }
+
+        function setupDropdown() {
+            const dropdown = document.getElementById('playlist-dropdown');
+            const searchInput = document.getElementById('playlist-search-input');
+            let focusedIndex = -1;
+
+            // Open on focus
+            searchInput.addEventListener('focus', () => {
+                openDropdown();
+                renderPlaylistOptions(searchInput.value);
+            });
+
+            // Filter on input
+            searchInput.addEventListener('input', (e) => {
+                openDropdown();
+                renderPlaylistOptions(e.target.value);
+                focusedIndex = -1;
+            });
+
+            // Keyboard navigation
+            searchInput.addEventListener('keydown', (e) => {
+                const options = document.querySelectorAll('#playlist-options .dropdown-item');
+
+                switch (e.key) {
+                    case 'Escape':
+                        closeDropdown();
+                        searchInput.blur();
+                        e.preventDefault();
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        if (!dropdown.classList.contains('open')) {
+                            openDropdown();
+                            renderPlaylistOptions(searchInput.value);
+                        }
+                        focusedIndex = Math.min(focusedIndex + 1, options.length - 1);
+                        updateFocusedOption(options, focusedIndex);
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        focusedIndex = Math.max(focusedIndex - 1, 0);
+                        updateFocusedOption(options, focusedIndex);
+                        break;
+                    case 'Enter':
+                        if (focusedIndex >= 0 && options[focusedIndex]) {
+                            e.preventDefault();
+                            options[focusedIndex].click();
+                        }
+                        break;
+                    case 'Tab':
+                        closeDropdown();
+                        break;
+                }
+            });
+
+            // Close on click outside
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target)) {
+                    closeDropdown();
+                }
+            });
+
+            function openDropdown() {
+                dropdown.classList.add('open');
+                dropdown.setAttribute('aria-expanded', 'true');
+            }
+
+            function closeDropdown() {
+                dropdown.classList.remove('open');
+                dropdown.setAttribute('aria-expanded', 'false');
+                focusedIndex = -1;
+            }
+
+            function updateFocusedOption(options, index) {
+                options.forEach((opt, i) => {
+                    if (i === index) {
+                        opt.classList.add('focused');
+                        opt.scrollIntoView({ block: 'nearest' });
+                    } else {
+                        opt.classList.remove('focused');
+                    }
+                });
+            }
+        }
+
+        function renderPlaylistOptions(filter = '') {
+            const container = document.getElementById('playlist-options');
+            container.innerHTML = '';
+
+            // "Create New" option
+            const newOption = document.createElement('div');
+            newOption.className = 'dropdown-item new-playlist';
+            newOption.setAttribute('role', 'option');
+            newOption.setAttribute('tabindex', '-1');
+            newOption.textContent = '+ Create New Playlist';
+            newOption.onclick = () => selectPlaylist('NEW', '✨ Create New Playlist...');
+            container.appendChild(newOption);
+
+            const lowerFilter = filter.toLowerCase();
+            const filtered = playlists.filter(p => p.name.toLowerCase().includes(lowerFilter));
+
+            if (filtered.length === 0) {
+                const noRes = document.createElement('div');
+                noRes.className = 'dropdown-item';
+                noRes.setAttribute('role', 'option');
+                noRes.setAttribute('aria-disabled', 'true');
+                noRes.style.pointerEvents = 'none';
+                noRes.style.color = '#777';
+                noRes.textContent = 'No playlists found';
+                container.appendChild(noRes);
+            }
+
+            filtered.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                item.setAttribute('role', 'option');
+                item.setAttribute('tabindex', '-1');
+
+                const imgUrl = p.images && p.images.length ? p.images[0].url : 'https://via.placeholder.com/40';
+                const altText = p.name ? `${escapeHTML(p.name)} cover` : 'Playlist cover';
+
+                item.innerHTML = `
+                    <img src="${imgUrl}" alt="${altText}">
+                    <div class="dropdown-item-content">
+                        <div class="dropdown-item-name">${escapeHTML(p.name)}</div>
+                        <div class="dropdown-item-tracks">${p.tracks.total} tracks</div>
+                    </div>
+                `;
+
+                item.onclick = () => selectPlaylist(p.id, p.name);
+                container.appendChild(item);
+            });
+        }
+
+        function renderSkeletonPlaylists() {
+            const container = document.getElementById('playlist-options');
+            container.innerHTML = '';
+
+            // Add 5 skeleton items
+            for (let i = 0; i < 5; i++) {
+                const skeleton = document.createElement('div');
+                skeleton.className = 'dropdown-item';
+                skeleton.innerHTML = `
+                    <div class="skeleton" style="width: 40px; height: 40px; border-radius: 4px; flex-shrink: 0;"></div>
+                    <div class="dropdown-item-content" style="flex: 1;">
+                        <div class="skeleton" style="width: 70%; height: 14px; margin-bottom: 8px;"></div>
+                        <div class="skeleton" style="width: 40%; height: 10px;"></div>
+                    </div>
+                `;
+                container.appendChild(skeleton);
+            }
+        }
+
+        function selectPlaylist(id, name) {
+            const hiddenInput = document.getElementById('playlist-select');
+            const searchInput = document.getElementById('playlist-search-input');
+            const dropdown = document.getElementById('playlist-dropdown');
+
+            hiddenInput.value = id;
+            if (id === 'NEW') {
+                searchInput.value = '';
+                searchInput.placeholder = name;
+            } else {
+                searchInput.value = name;
+            }
+
+            localStorage.setItem('spotify_last_playlist', id);
+
+            dropdown.classList.remove('open');
+            toggleNewPlaylistInput();
+
+            // Update tier preview with new playlist name
+            debouncedTierPreview();
+        }
+
+        function toggleNewPlaylistInput() {
+            const select = document.getElementById('playlist-select');
+            const container = document.getElementById('new-playlist-container');
+            if (select.value === 'NEW') {
+                container.classList.remove('hidden');
+                document.getElementById('new-playlist-name').focus();
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
+        async function createNewPlaylist(name) {
+            const userResponse = await fetchWithRateLimit('https://api.spotify.com/v1/me', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            if (!userResponse) {
+                throw new Error('Failed to fetch user data');
+            }
+            const userData = await userResponse.json();
+
+            const response = await fetchWithRateLimit(`https://api.spotify.com/v1/users/${userData.id}/playlists`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    description: 'Created with Spotify Album to Playlist Tool',
+                    public: false
+                })
+            });
+            if (!response) {
+                throw new Error('Failed to create playlist');
+            }
+            const data = await response.json();
+            return data.id;
+        }
+
+        async function asyncPool(poolLimit, items, iteratorFn) {
+            const results = [];
+            const executing = new Set();
+            for (const [index, item] of items.entries()) {
+                if (isCancelled) break;
+                const promise = Promise.resolve().then(() => iteratorFn(item, index));
+                results.push(promise);
+                executing.add(promise);
+                const clean = () => executing.delete(promise);
+                promise.then(clean, clean);
+                if (executing.size >= poolLimit) {
+                    await Promise.race(executing);
+                }
+            }
+            return Promise.allSettled(results);
+        }
+
+        async function processAlbums() {
+            targetPlaylistId = document.getElementById('playlist-select').value;
+            const newPlaylistName = document.getElementById('new-playlist-name').value.trim();
+            const albumListText = document.getElementById('album-list').value.trim();
+
+            if (!albumListText) {
+                showStatus('Please enter an album list', 'error');
+                return;
+            }
+
+            if (!targetPlaylistId) {
+                showStatus('Please select a playlist', 'error');
+                return;
+            }
+
+            if (targetPlaylistId === 'NEW') {
+                if (!newPlaylistName) {
+                    showStatus('Please enter a name for the new playlist', 'error');
+                    return;
+                }
+                // DON'T create the playlist here - just note that we need a new one
+                existingTrackUris = new Set(); // New playlist is empty
+            } else {
+                // Fetch existing tracks to check for duplicates
+                addStatusMessage('Checking existing tracks in playlist...', 'info');
+                existingTrackUris = await getPlaylistTracks(targetPlaylistId);
+            }
+
+            const albumLines = albumListText.split('\n').filter(line => line.trim());
+            const total = albumLines.length;
+
+            const btn = document.getElementById('process-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Processing...';
+
+            const cancelBtn = document.getElementById('cancel-btn');
+
+            isCancelled = false;
+            cancelBtn.classList.remove('hidden');
+
+            let processedCount = 0;
+            let progressStartTime = Date.now();
+
+            const updateProgressWithCounter = (currentItem = '') => {
+                processedCount++;
+                updateProgress(processedCount, total, currentItem, progressStartTime);
+            };
+
+            resetProgress();
+            const statusArea = document.getElementById('status-area');
+            statusArea.classList.remove('hidden');
+            statusArea.innerHTML = ''; // Clear previous status
+            matchedAlbums = []; // Clear previous matches
+            failedAlbums = []; // Reset failed searches
+            document.getElementById('empty-state').classList.add('hidden');
+
+            const processOneAlbum = async (line, index) => {
+                if (isCancelled) {
+                    updateProgressWithCounter();
+                    return { status: 'cancelled', line, reason: 'Cancelled by user' };
+                }
+
+                const parsed = parseAlbumLine(line);
+                if (parsed.error) {
+                    addStatusMessage(`⚠️ Skipping invalid line: ${line}`, 'error');
+                    updateProgressWithCounter();
+                    return { status: 'skipped', line, artist: parsed.artist || '', albumName: parsed.albumName || '', reason: parsed.error };
+                }
+
+                const { artist, albumName } = parsed;
+
+                try {
+                    const searchResult = await findBestAlbumVersion(artist, albumName);
+
+                    if (!searchResult || !searchResult.candidates || searchResult.candidates.length === 0) {
+                        addStatusMessage(`❌ Not found: ${artist} - ${albumName}`, 'error');
+                        updateProgressWithCounter();
+                        return { status: 'not_found', line, artist, albumName, reason: 'Not found in Spotify' };
+                    }
+
+                    const bestAlbum = searchResult.best;
+                    const tracks = await getAlbumTracks(bestAlbum.id);
+
+                    addStatusMessage(`✅ Found: ${bestAlbum.name} - ${artist}`, 'success');
+
+                    // Update Progress UI
+                    updateProgressWithCounter(`${artist} - ${bestAlbum.name}`);
+
+                    return {
+                        status: 'found',
+                        artist,
+                        album: bestAlbum,
+                        candidates: searchResult.candidates,
+                        trackUris: tracks.map(t => t.uri),
+                        trackObjects: tracks // Store full track objects for popularity sorting
+                    };
+                } catch (error) {
+                    addStatusMessage(`❌ Error: ${artist} - ${albumName}`, 'error');
+                    updateProgressWithCounter();
+                    return { status: 'error', line, artist, albumName, reason: error.message || 'API error' };
+                }
+            };
+
+            const poolResults = await asyncPool(3, albumLines, processOneAlbum);
+
+            poolResults.forEach(res => {
+                if (res.status === 'fulfilled') {
+                    if (res.value.status === 'found') {
+                        matchedAlbums.push(res.value);
+                    } else if (res.value.status === 'not_found' || res.value.status === 'error' || res.value.status === 'skipped') {
+                        failedAlbums.push(res.value);
+                    }
+                }
+            });
+
+            if (isCancelled) {
+                addStatusMessage('🛑 Processing stopped by user.', 'error');
+            }
+
+            // 100% Progress
+            updateProgress(total, total, '', progressStartTime);
+
+            if (matchedAlbums.length > 0) {
+                renderPreview();
+                addStatusMessage(`🔍 Found ${matchedAlbums.length} albums. Please confirm the matches below.`, 'info');
+            } else if (failedAlbums.length === 0) {
+                addStatusMessage('No tracks were found to add.', 'error');
+            }
+
+            if (failedAlbums.length > 0) {
+                renderFailureSummary();
+            }
+
+            btn.disabled = false;
+            btn.innerText = 'Search & Preview Albums';
+            cancelBtn.classList.add('hidden');
+            cancelBtn.disabled = false;
+            cancelBtn.innerText = 'Cancel';
+
+            // Hide progress bar after a moment
+            setTimeout(resetProgress, 5000);
+        }
+
+        let isGridView = false;
+        let dragSourceIndex = null;
+
+        function toggleView(view) {
+            isGridView = (view === 'grid');
+
+            document.getElementById('btn-list-view').classList.toggle('active', !isGridView);
+            document.getElementById('btn-grid-view').classList.toggle('active', isGridView);
+
+            const list = document.getElementById('preview-list');
+            if (isGridView) {
+                list.classList.add('grid-view');
+            } else {
+                list.classList.remove('grid-view');
+            }
+        }
+
+        function renderPreview() {
+            const list = document.getElementById('preview-list');
+            const confirmSection = document.getElementById('confirmation-section');
+
+            list.innerHTML = '';
+            // Apply grid view class if needed
+            if (isGridView) list.classList.add('grid-view');
+            else list.classList.remove('grid-view');
+
+            matchedAlbums.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.draggable = true;
+                div.dataset.index = index;
+
+                // Event Listeners for Drag and Drop
+                div.addEventListener('dragstart', handleDragStart);
+                div.addEventListener('dragover', handleDragOver);
+                div.addEventListener('drop', handleDrop);
+                div.addEventListener('dragend', handleDragEnd);
+
+                // Sync current checkbox state to data object if rerendering
+                const isSelected = item.selected !== undefined ? item.selected : true;
+
+                // Check for duplicates
+                const duplicates = item.trackUris.filter(uri => existingTrackUris.has(uri));
+                const allIsDup = duplicates.length === item.trackUris.length;
+                const someIsDup = duplicates.length > 0 && !allIsDup;
+
+                // Get the smallest image available
+                const image = item.album.images && item.album.images.length > 0
+                    ? [...item.album.images].sort((a, b) => a.height - b.height)[0]
+                    : null;
+                const imgSrc = image ? image.url : 'https://via.placeholder.com/60';
+
+                // Confidence Calculation
+                let confidenceClass = 'confidence-medium';
+                let scoreClass = 'score-medium';
+                const score = item.album.matchScore || 0;
+
+                if (score >= 0.8) {
+                    confidenceClass = 'confidence-high';
+                    scoreClass = 'score-high';
+                } else if (score < 0.5) {
+                    confidenceClass = 'confidence-low';
+                    scoreClass = 'score-low';
+                }
+
+                div.className = `preview-item ${confidenceClass}`;
+
+                let dupWarning = '';
+                let initiallyChecked = isSelected ? 'checked' : '';
+
+                if (allIsDup) {
+                    dupWarning = `<span style="color: #ff9800; font-size: 0.75rem; display: block;">⚠️ Entire album already in playlist</span>`;
+                    if (item.selected === undefined) initiallyChecked = '';
+                    // Note: Confidence border takes precedence, but we append duplicate warning
+                } else if (someIsDup) {
+                    dupWarning = `<span style="color: #ff9800; font-size: 0.75rem; display: block;">⚠️ ${duplicates.length} tracks already in playlist</span>`;
+                }
+
+                // Create Version Selector if multiple candidates
+                let versionSelector = '';
+                if (item.candidates && item.candidates.length > 1) {
+                    const options = item.candidates.map((c, i) => {
+                        const year = c.release_date ? c.release_date.split('-')[0] : 'N/A';
+                        const isCurrent = c.id === item.album.id;
+                        return `<option value="${i}" ${isCurrent ? 'selected' : ''}>${escapeHTML(c.name.substring(0, 30))} (${year})</option>`;
+                    }).join('');
+
+                    versionSelector = `
+                        <select onchange="changeAlbumVersion(${index}, this.value)" aria-label="Select album version" style="margin-top: 5px; padding: 4px; font-size: 0.75rem; background: rgba(255,255,255,0.1); color: var(--spotify-light-gray); border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); width: auto; max-width: 100%; pointer-events: auto;">
+                            ${options}
+                        </select>
+                    `;
+                }
+
+                const safeAlbumName = escapeHTML(item.album.name);
+                const safeArtistNames = escapeHTML(item.album.artists.map(a => a.name).join(', '));
+
+                div.innerHTML = `
+                    <div class="drag-handle" aria-label="Drag to reorder" role="button">≡</div>
+                    <input type="checkbox" ${initiallyChecked} id="match-${index}" aria-label="Select album: ${safeAlbumName}" style="width: 20px; height: 20px; accent-color: var(--spotify-green); cursor: pointer;" onclick="event.stopPropagation()" onchange="debouncedTierPreview()">
+                    
+                    <img src="${imgSrc}" alt="${safeAlbumName} cover" style="width: 50px; height: 50px; border-radius: 4px; object-fit: cover;">
+                    
+                    <div class="preview-item-details" style="flex: 1; overflow: hidden; pointer-events: none; display: flex; flex-direction: column;">
+                        <div style="font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; pointer-events: auto;">
+                            ${safeAlbumName} 
+                            <span class="match-score ${scoreClass}" title="Confidence Score: ${Math.round(score * 100)}%">${Math.round(score * 100)}%</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--spotify-light-gray); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${safeArtistNames}</div>
+                        ${dupWarning}
+                        <div style="pointer-events: auto;">${versionSelector}</div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+
+            confirmSection.classList.remove('hidden');
+
+            // Update tier preview after rendering the album list
+            renderTierPreview();
+        }
+
+        function handleDragStart(e) {
+            dragSourceIndex = parseInt(this.dataset.index);
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDrop(e) {
+            e.stopPropagation();
+            const targetIndex = parseInt(this.dataset.index);
+
+            if (dragSourceIndex !== targetIndex) {
+                // Save current checked states into the objects before reordering
+                matchedAlbums.forEach((item, idx) => {
+                    item.selected = document.getElementById(`match-${idx}`).checked;
+                });
+
+                // Reorder array
+                const movedItem = matchedAlbums.splice(dragSourceIndex, 1)[0];
+                matchedAlbums.splice(targetIndex, 0, movedItem);
+
+                renderPreview();
+            }
+            return false;
+        }
+
+        function handleDragEnd() {
+            this.classList.remove('dragging');
+        }
+
+        async function changeAlbumVersion(index, candidateIndex) {
+            const item = matchedAlbums[index];
+            const newAlbum = item.candidates[candidateIndex];
+
+            showStatus(`Switching to: ${newAlbum.name}...`, 'info');
+
+            try {
+                const tracks = await getAlbumTracks(newAlbum.id);
+                item.album = newAlbum;
+                item.trackUris = tracks.map(t => t.uri);
+                item.trackObjects = tracks; // Store full track objects for popularity sorting
+
+                // Save current selections before rerender
+                matchedAlbums.forEach((it, idx) => {
+                    it.selected = document.getElementById(`match-${idx}`).checked;
+                });
+
+                renderPreview();
+                clearStatus();
+            } catch (error) {
+                showStatus(`Error switching version: ${error.message}`, 'error');
+            }
+        }
+
+        // --- Tiering Logic ---
+
+        function updateTieringUI() {
+            const strategy = document.getElementById('tier-strategy').value;
+            const paramInput = document.getElementById('tier-param-input');
+            const paramLabel = document.getElementById('tier-param-label');
+            const desc = document.getElementById('strategy-desc');
+            const maxTracksInput = document.getElementById('max-tracks');
+            const modeGroup = document.getElementById('tier-mode-group');
+
+            // Reset states
+            paramInput.disabled = true;
+            paramInput.classList.add('disabled');
+            paramInput.value = '';
+            paramInput.placeholder = '-';
+
+            maxTracksInput.disabled = false;
+            maxTracksInput.classList.remove('disabled');
+            maxTracksInput.placeholder = 'Unlimited';
+
+            modeGroup.classList.add('hidden');
+
+            document.getElementById('constraint-warning').classList.add('hidden');
+            document.getElementById('constraint-error').classList.add('hidden');
+
+            if (strategy === 'halving') {
+                paramLabel.textContent = 'N / A';
+                desc.textContent = 'Nested playlists: Top 100%, Top 50%, Top 25%... (Tracks repeat)';
+                // Decision #5: Disable Max Tracks for Halving
+                maxTracksInput.disabled = true;
+                maxTracksInput.classList.add('disabled');
+
+            } else if (strategy === 'partitioning') {
+                paramLabel.textContent = 'N / A';
+                desc.textContent = 'Sequential playlists: Part 1, Part 2... (No repeats)';
+                // Decision #1: Max Tracks is REQUIRED for Partitioning
+                maxTracksInput.placeholder = 'Required';
+
+            } else if (strategy === 'top_n') {
+                paramLabel.textContent = 'Top N';
+                paramInput.disabled = false;
+                paramInput.classList.remove('disabled');
+                paramInput.placeholder = 'e.g. 3';
+                desc.textContent = 'Selects the N most popular tracks from each album.';
+                modeGroup.classList.remove('hidden');
+            } else if (strategy === 'time_bounded') {
+                paramLabel.textContent = 'Minutes';
+                paramInput.disabled = false;
+                paramInput.classList.remove('disabled');
+                paramInput.placeholder = 'e.g. 60';
+                desc.textContent = 'Chunks tracks into playlists of roughly N minutes.';
+            }
+        }
+
+        function getTieringOptions() {
+            const strategy = document.getElementById('tier-strategy').value;
+            const paramVal = parseInt(document.getElementById('tier-param-input').value) || 0;
+            const maxPlaylists = parseInt(document.getElementById('max-playlists').value) || Infinity;
+            const maxTracks = parseInt(document.getElementById('max-tracks').value) || 0;
+            const mode = document.getElementById('tier-mode-select').value;
+
+            return {
+                strategy,
+                param: paramVal,
+                maxPlaylists,
+                maxTracks,
+                mode
+            };
+        }
+
+        function calculatePlaylistTiers(selectedAlbums) {
+            const options = getTieringOptions();
+            const tiers = [];
+
+            // Filter out tracks already in the target playlist before tiering
+            selectedAlbums = selectedAlbums.map(albumData => {
+                const uniqueTrackUris = Array.from(new Set((albumData.trackUris || []).filter(uri => !existingTrackUris.has(uri))));
+                const filteredTrackObjects = (albumData.trackObjects || []).filter(t => uniqueTrackUris.includes(t.uri));
+                return {
+                    ...albumData,
+                    trackUris: uniqueTrackUris,
+                    trackObjects: filteredTrackObjects
+                };
+            }).filter(albumData => (albumData.trackUris || []).length > 0);
+
+            if (selectedAlbums.length === 0) {
+                return [];
+            }
+
+            // Pool all tracks with metadata
+            let allTracks = selectedAlbums.flatMap(albumData => {
+                return (albumData.trackUris || []).map(uri => {
+                    const trackObj = albumData.trackObjects?.find(t => t.uri === uri);
+                    return {
+                        uri,
+                        popularity: trackObj?.popularity || 0,
+                        duration_ms: trackObj?.duration_ms || 0,
+                        albumName: albumData.album.name,
+                        artistName: albumData.album.artists[0]?.name
+                    };
+                });
+            });
+
+            // --- STRATEGY: TOP N PER ALBUM ---
+            if (options.strategy === 'top_n') {
+                const n = options.param || 3;
+
+                // Helper to get tracks from an album sorted by popularity
+                const getAlbumTracksSorted = (albumData) => {
+                    return (albumData.trackUris || []).map(uri => {
+                        const trackObj = albumData.trackObjects?.find(t => t.uri === uri);
+                        return {
+                            uri,
+                            popularity: trackObj?.popularity || 0,
+                            duration_ms: trackObj?.duration_ms || 0
+                        };
+                    }).sort((a, b) => b.popularity - a.popularity);
+                };
+
+                if (options.mode === 'multi') {
+                    // Multi-tier: Rank 1-N, N+1-2N, etc.
+                    let batchIndex = 0;
+                    while (true) {
+                        const startRank = batchIndex * n;
+                        const endRank = startRank + n;
+
+                        let tierTracks = [];
+
+                        selectedAlbums.forEach(album => {
+                            const sorted = getAlbumTracksSorted(album);
+                            const chunk = sorted.slice(startRank, endRank);
+                            tierTracks.push(...chunk);
+                        });
+
+                        if (tierTracks.length === 0) break;
+
+                        // Sort tier by global popularity
+                        tierTracks.sort((a, b) => b.popularity - a.popularity);
+
+                        tiers.push({
+                            tracks: tierTracks.map(t => t.uri),
+                            nameSuffix: batchIndex === 0 ? '' : ` - Tier ${batchIndex + 1}`
+                        });
+
+                        batchIndex++;
+                        if (tiers.length > 20) break; // Safety
+                    }
+
+                } else {
+                    // Single Mode (Phase 1 Logic)
+                    allTracks = selectedAlbums.flatMap(albumData => {
+                        const sorted = getAlbumTracksSorted(albumData);
+                        return sorted.slice(0, n);
+                    });
+
+                    allTracks.sort((a, b) => b.popularity - a.popularity);
+
+                    // Logic for Max Tracks Overflow (Phase 1 legacy)
+                    if (options.maxTracks > 0 && allTracks.length > options.maxTracks) {
+                        for (let i = 0; i < allTracks.length; i += options.maxTracks) {
+                            tiers.push({
+                                tracks: allTracks.slice(i, i + options.maxTracks).map(t => t.uri),
+                                nameSuffix: ` - Part ${tiers.length + 1}`
+                            });
+                        }
+                    } else {
+                        tiers.push({
+                            tracks: allTracks.map(t => t.uri),
+                            nameSuffix: ''
+                        });
+                    }
+                }
+
+            }
+            // --- STRATEGY: TIME BOUNDED (Phase 2) ---
+            else if (options.strategy === 'time_bounded') {
+                const targetMinutes = options.param || 60;
+                const targetMs = targetMinutes * 60 * 1000;
+
+                allTracks.sort((a, b) => b.popularity - a.popularity);
+
+                let currentChunk = [];
+                let currentDuration = 0;
+
+                for (const track of allTracks) {
+                    currentChunk.push(track.uri);
+                    currentDuration += track.duration_ms;
+
+                    if (currentDuration >= targetMs) {
+                        tiers.push({
+                            tracks: [...currentChunk],
+                            nameSuffix: ` - Part ${tiers.length + 1}`
+                        });
+                        currentChunk = [];
+                        currentDuration = 0;
+                    }
+                }
+
+                // Add remainder
+                if (currentChunk.length > 0) {
+                    tiers.push({
+                        tracks: currentChunk,
+                        nameSuffix: ` - Part ${tiers.length + 1}`
+                    });
+                }
+
+            }
+            // --- STRATEGY: PARTITIONING ---
+            else if (options.strategy === 'partitioning') {
+                if (options.maxTracks <= 0) return []; // Waiting for input
+
+                allTracks.sort((a, b) => b.popularity - a.popularity);
+
+                for (let i = 0; i < allTracks.length; i += options.maxTracks) {
+                    tiers.push({
+                        tracks: allTracks.slice(i, i + options.maxTracks).map(t => t.uri),
+                        nameSuffix: ` - Part ${tiers.length + 1}`
+                    });
+                }
+            }
+            // --- STRATEGY: POPULARITY HALVING (Legacy) ---
+            else {
+                // Tier 0
+                allTracks.sort((a, b) => b.popularity - a.popularity);
+
+                const minThresholds = [Infinity, 4, 3, 2, 1];
+                let currentTierWrappers = selectedAlbums.map(album => ({
+                    tracks: [...(album.trackUris || [])].sort((a, b) => {
+                        const tA = album.trackObjects?.find(t => t.uri === a)?.popularity || 0;
+                        const tB = album.trackObjects?.find(t => t.uri === b)?.popularity || 0;
+                        return tB - tA;
+                    })
+                }));
+
+                tiers.push({
+                    tracks: currentTierWrappers.flatMap(a => a.tracks),
+                    nameSuffix: ''
+                });
+
+                let thresholdIndex = 1;
+
+                while (true) {
+                    const minThreshold = minThresholds[Math.min(thresholdIndex, minThresholds.length - 1)];
+                    const nextWrappers = [];
+
+                    for (const w of currentTierWrappers) {
+                        const currentCount = w.tracks.length;
+                        let targetCount = Math.ceil(currentCount / 2);
+                        targetCount = Math.max(targetCount, minThreshold);
+                        targetCount = Math.min(targetCount, currentCount);
+
+                        nextWrappers.push({
+                            tracks: w.tracks.slice(0, targetCount)
+                        });
+                    }
+
+                    const newTierTracks = nextWrappers.flatMap(a => a.tracks);
+                    const prevTierTracks = currentTierWrappers.flatMap(a => a.tracks);
+
+                    if (newTierTracks.length >= prevTierTracks.length || newTierTracks.length === 0) break;
+
+                    let suffix = '';
+                    if (tiers.length === 1) suffix = ' - Best';
+                    else if (tiers.length === 2) suffix = ' - Essentials';
+                    else suffix = ` - Top ${Math.round((1 / Math.pow(2, tiers.length)) * 100)}%`;
+
+                    tiers.push({
+                        tracks: newTierTracks,
+                        nameSuffix: suffix
+                    });
+
+                    currentTierWrappers = nextWrappers;
+                    thresholdIndex++;
+
+                    if (currentTierWrappers.every(a => a.tracks.length <= 1)) break;
+                    if (tiers.length > 50) break; // Safety cap to guard against runaway loops
+                }
+            }
+
+            return tiers;
+        }
+
+        // Render a visual preview of the playlists that will be created
+        function renderTierPreview() {
+            const previewContainer = document.getElementById('tier-preview');
+            const contentContainer = document.getElementById('tier-preview-content');
+            const warningEl = document.getElementById('constraint-warning');
+            const errorEl = document.getElementById('constraint-error');
+
+            const selectedAlbums = getSelectedAlbums();
+            const options = getTieringOptions();
+
+            // Clear messages
+            warningEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+
+            if (selectedAlbums.length === 0) {
+                previewContainer.classList.add('hidden');
+                return;
+            }
+
+            // Early Validation for Partitioning
+            if (options.strategy === 'partitioning' && options.maxTracks <= 0) {
+                contentContainer.innerHTML = '<div class="tier-summary">Enter "Max Tracks per Playlist" to preview partitioning.</div>';
+                previewContainer.classList.remove('hidden');
+                return;
+            }
+
+            const tiers = calculatePlaylistTiers(selectedAlbums);
+
+            // Constraint Checks
+            if (options.maxPlaylists > 0 && tiers.length > options.maxPlaylists) {
+                errorEl.textContent = `❌ Constraint: Generates ${tiers.length} playlists, but Max Playlists is ${options.maxPlaylists}.`;
+                errorEl.classList.remove('hidden');
+            }
+
+            // Ensure we have a base name
+            const playlistSelect = document.getElementById('playlist-select').value;
+            const newPlaylistName = document.getElementById('new-playlist-name').value.trim();
+            let baseName;
+            if (playlistSelect === 'NEW') {
+                baseName = newPlaylistName || 'New Playlist';
+            } else {
+                const selectedPlaylist = playlists.find(p => p.id === playlistSelect);
+                baseName = selectedPlaylist ? selectedPlaylist.name : 'Playlist';
+            }
+
+            // Create lookup map for duration
+            const trackMap = new Map();
+            selectedAlbums.forEach(album => {
+                if (album.trackObjects) {
+                    album.trackObjects.forEach(t => {
+                        trackMap.set(t.uri, t.duration_ms);
+                    });
+                }
+            });
+
+            // Helper for formatting
+            const formatDuration = (ms) => {
+                if (!ms) return '0m';
+                const totalMinutes = Math.round(ms / 60000);
+                const h = Math.floor(totalMinutes / 60);
+                const m = totalMinutes % 60;
+                if (h > 0) return `${h}h ${m}m`;
+                return `${m}m`;
+            };
+
+            // Build the preview HTML
+            let html = '';
+            let totalTracks = 0;
+
+            tiers.forEach((tier, index) => {
+                const tierTracks = tier.tracks.length;
+                totalTracks += tierTracks;
+                const playlistName = `${baseName}${tier.nameSuffix}`;
+                const isPrimary = index === 0;
+
+                // Calculate duration
+                const tierDurationMs = tier.tracks.reduce((sum, uri) => sum + (trackMap.get(uri) || 0), 0);
+                const durationStr = formatDuration(tierDurationMs);
+
+                html += `
+                    <div class="tier-playlist-card ${isPrimary ? 'primary' : ''}">
+                        <div class="tier-playlist-name" title="${escapeHTML(playlistName)}">
+                            ${isPrimary ? '✨' : '📄'} ${escapeHTML(playlistName)}
+                        </div>
+                        <div class="tier-playlist-stats">
+                            <span class="track-count">${tierTracks} tracks</span> • ${durationStr}
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Add summary
+            html += `
+                <div class="tier-summary">
+                    <strong>${tiers.length}</strong> playlist${tiers.length > 1 ? 's' : ''} will be created with <strong>${totalTracks}</strong> total tracks
+                </div>
+            `;
+
+            contentContainer.innerHTML = html;
+            previewContainer.classList.remove('hidden');
+        }
+
+        // Debounced version for checkbox changes
+        const debouncedTierPreview = debounce(renderTierPreview, 300);
+
+        async function commitSelection() {
+            const playlistSelect = document.getElementById('playlist-select').value;
+            const newPlaylistName = document.getElementById('new-playlist-name').value.trim();
+            const options = getTieringOptions();
+
+            // Determine base playlist name
+            let baseName;
+            if (playlistSelect === 'NEW') {
+                if (!newPlaylistName) {
+                    showStatus('Please enter a name for the new playlist', 'error');
+                    return;
+                }
+                baseName = newPlaylistName;
+            } else {
+                const selectedPlaylist = playlists.find(p => p.id === playlistSelect);
+                baseName = selectedPlaylist ? selectedPlaylist.name : 'My Playlist';
+            }
+
+            const selectedAlbums = getSelectedAlbums();
+            if (selectedAlbums.length === 0) {
+                showStatus('Please select at least one album to add.', 'error');
+                return;
+            }
+
+            // Calculate Tiers
+            addStatusMessage('📊 Calculating playlist tiers...', 'info');
+            const tiers = calculatePlaylistTiers(selectedAlbums);
+
+            if (tiers.length === 0 || tiers.every(t => t.tracks.length === 0)) {
+                showStatus('No new tracks to add after removing duplicates from the selected playlist.', 'error');
+                commitBtn.disabled = false;
+                commitBtn.innerText = 'Add Selected to Playlist';
+                return;
+            }
+
+            // Validate Constraints (Decision #4: Block)
+            if (options.maxPlaylists > 0 && tiers.length > options.maxPlaylists) {
+                showStatus(`Blocked: Strategy generates ${tiers.length} playlists (Limit: ${options.maxPlaylists}). Adjust constraints.`, 'error');
+                return;
+            }
+            if (options.strategy === 'partitioning' && options.maxTracks <= 0) {
+                showStatus('Blocked: "Max Tracks per Playlist" is required for Partitioning.', 'error');
+                return;
+            }
+
+            const commitBtn = document.getElementById('commit-btn');
+            commitBtn.disabled = true;
+            commitBtn.innerHTML = '<span class="spinner"></span> Creating Playlists...';
+
+            try {
+                addStatusMessage(`🎵 Creating ${tiers.length} playlist(s)...`, 'info');
+
+                let createdList = [];
+
+                for (let i = 0; i < tiers.length; i++) {
+                    const tier = tiers[i];
+                    const playlistName = `${baseName}${tier.nameSuffix}`;
+
+                    // Logic:
+                    // If i==0 AND target is Existing, we add to targetPlaylistId.
+                    // ELSE we create new.
+                    // WAIT: "Partitioning single case" or "Top N single case" might result in 1 playlist.
+                    // If target is EXISTING, and we have multiple tiers:
+                    // Tier 0 -> Existing. Tier 1..N -> NEW playlists? 
+                    // Usually yes, Tier 0 extends existing, others split off.
+
+                    let targetId = null;
+                    let isNew = false;
+
+                    if (i === 0 && playlistSelect !== 'NEW' && targetPlaylistId) {
+                        targetId = targetPlaylistId;
+                        addStatusMessage(`Adding ${tier.tracks.length} tracks to existing playlist "${baseName}"...`, 'info');
+                    } else {
+                        // Create New
+                        addStatusMessage(`Creating new playlist: "${playlistName}"...`, 'info');
+                        try {
+                            targetId = await createNewPlaylist(playlistName);
+                            isNew = true;
+                        } catch (e) {
+                            addStatusMessage(`❌ Failed to create "${playlistName}".`, 'error');
+                            continue;
+                        }
+                    }
+
+                    if (targetId && tier.tracks.length > 0) {
+                        await addTracksToPlaylist(targetId, tier.tracks);
+                        createdList.push({ name: playlistName, count: tier.tracks.length });
+                    }
+
+                    if (i < tiers.length - 1) await delay(300); // Rate limit buffer
+                }
+
+                // Success summary
+                const totalTracks = createdList.reduce((sum, p) => sum + p.count, 0);
+                showToast(`✨ Processed ${createdList.length} playlist(s) with ${totalTracks} tracks!`, 'success');
+
+                createdList.forEach(p => {
+                    addStatusMessage(`   ✅ "${p.name}" - ${p.count} tracks`, 'info');
+                });
+
+                partyMode();
+
+                commitBtn.classList.add('success-pulse');
+                setTimeout(() => commitBtn.classList.remove('success-pulse'), 2000);
+
+                localStorage.removeItem('spotify_album_list');
+                document.getElementById('album-list').value = '';
+                setTimeout(resetToSearch, 5000);
+
+            } catch (error) {
+                addStatusMessage(`Error: ${error.message}`, 'error');
+            } finally {
+                commitBtn.disabled = false;
+                commitBtn.innerText = 'Add Selected to Playlist';
+            }
+        }
+
+        function resetToSearch() {
+            document.getElementById('confirmation-section').classList.add('hidden');
+            document.getElementById('empty-state').classList.remove('hidden');
+            document.getElementById('tier-preview').classList.add('hidden');
+            matchedAlbums = [];
+        }
+
+        function cancelProcessing() {
+            isCancelled = true;
+            document.getElementById('cancel-btn').disabled = true;
+            document.getElementById('cancel-btn').innerText = 'Stopping...';
+        }
+
+        function updateProgress(current, total, currentItem = '', startTime = null) {
+            const wrapper = document.getElementById('progress-wrapper');
+            const label = document.getElementById('progress-label');
+            const percent = document.getElementById('progress-percent');
+            const fill = document.getElementById('progress-fill');
+            const eta = document.getElementById('progress-eta');
+
+            wrapper.style.display = 'block';
+
+            const percentage = Math.round((current / total) * 100);
+            fill.style.width = `${percentage}%`;
+            percent.textContent = `${percentage}%`;
+
+            if (currentItem) {
+                label.textContent = `Processing ${current} of ${total}: ${currentItem}`;
+            } else {
+                label.textContent = `Processing ${current} of ${total} albums...`;
+            }
+
+            // Calculate ETA
+            if (startTime && current > 0) {
+                const elapsed = Date.now() - startTime;
+                const avgTimePerItem = elapsed / current;
+                const remaining = (total - current) * avgTimePerItem;
+
+                if (remaining > 60000) {
+                    eta.textContent = `~${Math.ceil(remaining / 60000)} min remaining`;
+                } else if (remaining > 1000) {
+                    eta.textContent = `~${Math.ceil(remaining / 1000)}s remaining`;
+                } else {
+                    eta.textContent = 'Almost done...';
+                }
+            } else {
+                eta.textContent = '';
+            }
+        }
+
+        function resetProgress() {
+            document.getElementById('progress-wrapper').style.display = 'none';
+            document.getElementById('progress-fill').style.width = '0%';
+            document.getElementById('progress-percent').textContent = '0%';
+            document.getElementById('progress-label').textContent = 'Processing...';
+            document.getElementById('progress-eta').textContent = '';
+        }
+
+        function showToast(message, type = 'info', duration = 5000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const icons = {
+                success: '✅',
+                error: '❌',
+                info: 'ℹ️'
+            };
+
+            toast.innerHTML = `
+                <span style="font-size: 1.2rem;">${icons[type]}</span>
+                <span style="flex: 1;">${escapeHTML(message)}</span>
+                <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+            `;
+
+            container.appendChild(toast);
+
+            // Auto-remove after duration
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, duration);
+        }
+
+        // New Helper: Add rich status messages
+        function addStatusMessage(text, type) {
+            const container = document.getElementById('status-area');
+            const div = document.createElement('div');
+            div.className = `status-message ${type}`;
+
+            // Icons based on type
+            let icon = '';
+            if (type === 'success') icon = '<span style="font-size:1.2em">✔️</span>';
+            if (type === 'error') icon = '<span style="font-size:1.2em">❌</span>';
+            if (type === 'info') icon = '<span style="font-size:1.2em">ℹ️</span>';
+
+            div.innerHTML = `${icon} <span>${escapeHTML(text)}</span>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function partyMode() {
+            // Simple confetti effect using colored particles could go here
+            // For now, let's just make the button pulse
+            const btn = document.getElementById('process-btn');
+            btn.style.animation = 'pulse 1s infinite';
+            setTimeout(() => btn.style.animation = '', 3000);
+        }
+
+        function renderFailureSummary() {
+            // Remove existing summary if present
+            document.getElementById('failure-summary')?.remove();
+
+            if (failedAlbums.length === 0) return;
+
+            const summaryDiv = document.createElement('div');
+            summaryDiv.id = 'failure-summary';
+            summaryDiv.style = "background: rgba(229, 9, 20, 0.1); border-radius: 8px; padding: 15px; margin-top: 15px; border-left: 4px solid #E50914;";
+
+            const listItems = failedAlbums.map((f, index) => {
+                // Build suggestions dropdown if partial matches exist
+                let suggestionsHTML = '';
+                if (f.partialMatches && f.partialMatches.length > 0) {
+                    const options = f.partialMatches.map((m, i) => {
+                        const year = m.release_date ? m.release_date.split('-')[0] : '';
+                        const label = `${escapeHTML(m.name)}${year ? ` (${year})` : ''}`;
+                        return `<option value="${i}">${label}</option>`;
+                    }).join('');
+                    suggestionsHTML = `
+                        <select id="suggestion-${index}" 
+                                onchange="selectSuggestion(${index}, this.value)"
+                                aria-label="Select alternative album">
+                            <option value="">💡 Suggestions...</option>
+                            ${options}
+                        </select>
+                    `;
+                }
+
+                return `
+                <li class="failed-item" data-index="${index}">
+                    <div class="failed-item-header">
+                        <input type="text" 
+                               id="retry-query-${index}" 
+                               value="${escapeHTML(f.artist)} - ${escapeHTML(f.albumName)}" 
+                               aria-label="Edit search query"
+                               onkeydown="if(event.key === 'Enter') retrySingleAlbum(${index})"
+                               style="flex: 1; min-width: 180px; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; font-size: 0.85rem;"
+                        />
+                        <span class="failed-badge">Not Found</span>
+                    </div>
+                    <div class="failed-item-actions">
+                        <button onclick="retrySingleAlbum(${index})" 
+                                id="retry-btn-${index}"
+                                class="btn-retry"
+                                aria-label="Retry search for this album">
+                            🔄 Retry
+                        </button>
+                        <button onclick="removeFailedItem(${index})" 
+                                class="btn-remove"
+                                aria-label="Remove this album from failed list">
+                            ✕ Remove
+                        </button>
+                        ${suggestionsHTML}
+                    </div>
+                    <div id="retry-status-${index}" aria-live="polite" style="font-size: 0.75rem; color: var(--spotify-light-gray); margin-top: 8px;">
+                        ${escapeHTML(f.reason)}
+                    </div>
+                </li>
+            `;
+            }).join('');
+
+            summaryDiv.innerHTML = `
+                <h3 style="color: #E50914; margin-bottom: 10px; font-size: 1rem;">
+                    ⚠️ <span id="failed-count">${failedAlbums.length}</span> Album(s) Not Found
+                </h3>
+                <p style="font-size: 0.8rem; color: var(--spotify-light-gray); margin-bottom: 12px;">
+                    Edit the query and retry, pick a suggestion, or remove to skip.
+                </p>
+                <ul style="list-style: none; padding: 0; margin-bottom: 15px; max-height: 300px; overflow-y: auto;">
+                    ${listItems}
+                </ul>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="retryAllFailed()" aria-label="Retry all failed album searches" style="flex: 1; background: #E50914; padding: 10px; font-size: 0.8rem; border-radius: 4px;">
+                        🔄 Retry All (${failedAlbums.length})
+                    </button>
+                    <button onclick="removeAllFailed()" aria-label="Remove all failed albums" style="width: auto; background: #333; padding: 10px; font-size: 0.8rem; border-radius: 4px;">
+                        ✕ Clear All
+                    </button>
+                    <button onclick="copyFailedToClipboard()" aria-label="Copy failed albums to clipboard" style="width: auto; background: #333; padding: 10px; font-size: 0.8rem; border-radius: 4px;">
+                        📋 Copy
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('status-area').appendChild(summaryDiv);
+            document.getElementById('status-area').scrollTop = document.getElementById('status-area').scrollHeight;
+        }
+
+        async function retrySingleAlbum(index) {
+            const input = document.getElementById(`retry-query-${index}`);
+            const btn = document.getElementById(`retry-btn-${index}`);
+            const status = document.getElementById(`retry-status-${index}`);
+
+            const query = input.value.trim();
+            if (!query) {
+                status.innerHTML = '<span style="color: #ff6b6b;">Please enter a search query</span>';
+                return;
+            }
+
+            // Parse the query (expects "Artist - Album" format)
+            const parts = query.split(' - ');
+            if (parts.length < 2) {
+                status.innerHTML = '<span style="color: #ff6b6b;">Use format: Artist - Album</span>';
+                return;
+            }
+
+            const artist = parts[0].trim();
+            const albumName = parts.slice(1).join(' - ').trim();
+
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;margin:0;display:inline-block;"></span>';
+            status.innerHTML = '<span style="color: var(--spotify-light-gray);">🔍 Searching...</span>';
+            input.disabled = true;
+
+            try {
+                const searchResult = await findBestAlbumVersion(artist, albumName);
+
+                if (!searchResult || !searchResult.candidates || searchResult.candidates.length === 0) {
+                    status.innerHTML = '<span style="color: #ff6b6b;">Still not found. Try different keywords.</span>';
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 Retry';
+                    input.disabled = false;
+                    return;
+                }
+
+                const bestAlbum = searchResult.best;
+                const tracks = await getAlbumTracks(bestAlbum.id);
+
+                // Success! Add to matchedAlbums
+                matchedAlbums.push({
+                    status: 'found',
+                    artist,
+                    album: bestAlbum,
+                    candidates: searchResult.candidates,
+                    trackUris: tracks.map(t => t.uri),
+                    trackObjects: tracks
+                });
+
+                // Remove from failedAlbums
+                failedAlbums.splice(index, 1);
+
+                // Show success briefly
+                status.innerHTML = `<span style="color: var(--spotify-green);">✅ Found: ${escapeHTML(bestAlbum.name)}</span>`;
+                input.style.borderColor = 'var(--spotify-green)';
+                input.disabled = true;
+                btn.style.display = 'none';
+
+                // Show toast
+                showToast(`✅ Found: ${bestAlbum.name}`, 'success');
+
+                // Re-render the preview to include the new album
+                renderPreview();
+
+                // If there are still failures, re-render the summary (fixes index issues)
+                // If no more failures, remove the summary after a delay
+                setTimeout(() => {
+                    if (failedAlbums.length > 0) {
+                        renderFailureSummary(); // Re-render with correct indices
+                    } else {
+                        document.getElementById('failure-summary')?.remove();
+                        showToast('🎉 All albums found!', 'success');
+                    }
+                }, 1500);
+
+            } catch (error) {
+                status.innerHTML = `<span style="color: #ff6b6b;">Error: ${escapeHTML(error.message)}</span>`;
+                btn.disabled = false;
+                btn.innerHTML = '🔄 Retry';
+                input.disabled = false;
+            }
+        }
+
+        async function retryAllFailed() {
+            if (failedAlbums.length === 0) return;
+
+            // Gather current queries from inputs (user may have edited them)
+            const updatedLines = failedAlbums.map((f, index) => {
+                const input = document.getElementById(`retry-query-${index}`);
+                return input ? input.value.trim() : `${f.artist} - ${f.albumName}`;
+            }).filter(line => line.includes(' - '));
+
+            if (updatedLines.length === 0) return;
+
+            document.getElementById('album-list').value = updatedLines.join('\n');
+            localStorage.setItem('spotify_album_list', updatedLines.join('\n'));
+
+            failedAlbums = [];
+            document.getElementById('failure-summary')?.remove();
+
+            processAlbums();
+        }
+
+        function copyFailedToClipboard() {
+            const failedText = failedAlbums.map(f => f.line || `${f.artist} - ${f.albumName}`).join('\n');
+            navigator.clipboard.writeText(failedText).then(() => {
+                addStatusMessage('📋 Failed albums copied to clipboard', 'info');
+            }).catch(err => {
+                console.error('Clipboard error:', err);
+                addStatusMessage('❌ Failed to copy to clipboard. Please copy manually.', 'error');
+            });
+        }
+
+        function removeFailedItem(index) {
+            if (index >= 0 && index < failedAlbums.length) {
+                const removed = failedAlbums.splice(index, 1)[0];
+                showToast(`Removed: ${removed.artist} - ${removed.albumName}`, 'info');
+                renderFailureSummary();
+            }
+        }
+
+        function removeAllFailed() {
+            const count = failedAlbums.length;
+            failedAlbums = [];
+            document.getElementById('failure-summary')?.remove();
+            showToast(`Cleared ${count} failed album(s)`, 'info');
+        }
+
+        async function selectSuggestion(index, suggestionIndex) {
+            if (suggestionIndex === '' || suggestionIndex === null) return;
+
+            const failed = failedAlbums[index];
+            if (!failed || !failed.partialMatches) return;
+
+            const selectedAlbum = failed.partialMatches[parseInt(suggestionIndex)];
+            if (!selectedAlbum) return;
+
+            const status = document.getElementById(`retry-status-${index}`);
+            status.innerHTML = '<span style="color: var(--spotify-light-gray);">Loading selected album...</span>';
+
+            try {
+                const tracks = await getAlbumTracks(selectedAlbum.id);
+
+                // Add to matched albums
+                matchedAlbums.push({
+                    status: 'found',
+                    artist: failed.artist,
+                    album: selectedAlbum,
+                    candidates: failed.partialMatches,
+                    trackUris: tracks.map(t => t.uri),
+                    trackObjects: tracks
+                });
+
+                // Remove from failed
+                failedAlbums.splice(index, 1);
+
+                showToast(`✅ Added: ${selectedAlbum.name}`, 'success');
+                renderPreview();
+
+                setTimeout(() => {
+                    if (failedAlbums.length > 0) {
+                        renderFailureSummary();
+                    } else {
+                        document.getElementById('failure-summary')?.remove();
+                        showToast('🎉 All albums resolved!', 'success');
+                    }
+                }, 500);
+
+            } catch (error) {
+                status.innerHTML = `<span style="color: #ff8585;">Error: ${escapeHTML(error.message)}</span>`;
+            }
+        }
+
+        // --- Auto-save Helpers ---
+        const saveAlbumList = debounce(() => {
+            const albumList = document.getElementById('album-list').value;
+            localStorage.setItem('spotify_album_list', albumList);
+            console.log('Album list auto-saved');
+        }, 1000);
+
+        function restoreAlbumList() {
+            const saved = localStorage.getItem('spotify_album_list');
+            if (saved && saved.trim()) {
+                document.getElementById('album-list').value = saved;
+                // Only show toast if there are actual album lines
+                const lines = saved.split('\n').filter(line => line.trim());
+                if (lines.length > 0) {
+                    showToast(`📋 Restored ${lines.length} album(s) from last session`, 'info');
+                }
+            }
+        }
+        // --- End Auto-save Helpers ---
+
+        // --- Fuzzy Matching Helpers ---
+        function levenshtein(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function similarity(str1, str2) {
+            const s1 = (str1 || '').toLowerCase().trim();
+            const s2 = (str2 || '').toLowerCase().trim();
+            const maxLen = Math.max(s1.length, s2.length);
+            if (maxLen === 0) return 1;
+            return 1 - (levenshtein(s1, s2) / maxLen);
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function normalizeAlbumName(name) {
+            return (name || '')
+                .toLowerCase()
+                .replace(/\s*\(.*?\)\s*/g, '')  // Remove parenthetical content
+                .replace(/\s*\[.*?\]\s*/g, '')  // Remove bracketed content
+                .replace(/\s*(remastered|deluxe|edition|anniversary|expanded|bonus|version)\s*/gi, '')
+                .trim();
+        }
+
+        function normalizeDashes(str) {
+            return (str || '').replace(/[–—]/g, '-');
+        }
+
+        function parseAlbumLine(line) {
+            const normalized = normalizeDashes(line).trim();
+            const match = normalized.match(/^(.+?)\s+-\s+(.+)$/);
+            if (!match) {
+                return { error: 'Missing " - " separator' };
+            }
+
+            const artist = match[1].trim();
+            const albumName = match[2].trim();
+
+            if (!artist) {
+                return { error: 'Missing artist name' };
+            }
+            if (!albumName) {
+                return { error: 'Missing album name' };
+            }
+
+            return { artist, albumName };
+        }
+
+        function getSelectedAlbums() {
+            return matchedAlbums.filter((item, idx) => {
+                const checkbox = document.getElementById(`match-${idx}`);
+                return checkbox ? checkbox.checked : true;
+            });
+        }
+        // --- End Fuzzy Matching Helpers ---
+
+        async function findBestAlbumVersion(artist, albumName) {
+            // Strategy 1: Strict Field Search (Most accurate)
+            const cleanArtist = artist.replace(/["\\]/g, '');
+            const cleanAlbum = albumName.replace(/["\\]/g, '');
+
+            let query = `album:"${cleanAlbum}" artist:"${cleanArtist}"`;
+            let result = await performSearch(query, cleanArtist, cleanAlbum);
+
+            // Strategy 2: Loose Field Search
+            if (!result || result.candidates.length === 0) {
+                query = `album:${cleanAlbum} artist:${cleanArtist}`;
+                result = await performSearch(query, cleanArtist, cleanAlbum);
+            }
+
+            // Strategy 3: General Text Search
+            if (!result || result.candidates.length === 0) {
+                query = `${cleanArtist} ${cleanAlbum}`;
+                result = await performSearch(query, cleanArtist, cleanAlbum);
+            }
+
+            // Strategy 4: Alt Symbols
+            if ((!result || result.candidates.length === 0) && (cleanAlbum.includes('&') || cleanAlbum.includes('and'))) {
+                const altAlbum = cleanAlbum.replace(/\b(and)\b|&/gi, match => match.toLowerCase() === 'and' ? '&' : 'and');
+                query = `${cleanArtist} ${altAlbum}`;
+                result = await performSearch(query, cleanArtist, cleanAlbum);
+            }
+
+            // Strategy 5: Strip "The " from artist name
+            if ((!result || result.candidates.length === 0) && cleanArtist.toLowerCase().startsWith('the ')) {
+                const strippedArtist = cleanArtist.substring(4);
+                query = `${strippedArtist} ${cleanAlbum}`;
+                result = await performSearch(query, cleanArtist, cleanAlbum);
+            }
+
+            return result;
+        }
+
+        async function performSearch(query, expectedArtist, expectedAlbum) {
+            try {
+                const normalizedQuery = normalizeDashes(query);
+                const response = await fetchWithRateLimit(`https://api.spotify.com/v1/search?q=${encodeURIComponent(normalizedQuery)}&type=album&limit=10`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+
+                if (!response) return null;
+
+                const data = await response.json();
+                if (!data.albums || data.albums.items.length === 0) return null;
+
+                const albums = data.albums.items;
+                const ARTIST_THRESHOLD = 0.7; // 70% similarity required
+                const ALBUM_THRESHOLD = 0.5; // 50% similarity required
+                const candidates = [];
+
+                for (const album of albums) {
+                    // Check Artist Similarity
+                    const artistMatchScore = Math.max(
+                        ...album.artists.map(a => similarity(a.name, expectedArtist)),
+                        // Check for substring match (e.g. "D'Angelo" in "D'Angelo and The Vanguard")
+                        ...album.artists.map(a => {
+                            const sArtist = a.name.toLowerCase().trim();
+                            const iArtist = expectedArtist.toLowerCase().trim();
+                            return (sArtist.includes(iArtist) || iArtist.includes(sArtist)) ? 0.85 : 0;
+                        })
+                    );
+                    const albumMatchScore = Math.max(
+                        similarity(album.name, expectedAlbum),
+                        similarity(normalizeAlbumName(album.name), normalizeAlbumName(expectedAlbum))
+                    );
+
+                    if (artistMatchScore < ARTIST_THRESHOLD) continue;
+                    if (albumMatchScore < ALBUM_THRESHOLD) continue;
+
+                    // Fetch tracks for popularity ranking if we don't have it
+                    let popularity = album.popularity;
+                    if (popularity === undefined) {
+                        try {
+                            const tracks = await getAlbumTracks(album.id);
+                            popularity = tracks.reduce((sum, t) => sum + (t.popularity || 0), 0) / (tracks.length || 1);
+                        } catch (e) { popularity = 0; }
+                    }
+
+                    // Combined score: Artist (40%) + Album (40%) + Popularity (20%)
+                    const combinedScore = (artistMatchScore * 0.4) + (albumMatchScore * 0.4) + ((popularity / 100) * 0.2);
+
+                    candidates.push({
+                        ...album,
+                        matchScore: combinedScore
+                    });
+
+                    // Stop after finding top candidates to save API calls
+                    if (candidates.length >= 5) break;
+                }
+
+                if (candidates.length === 0) return null;
+
+                // Sort by combined score
+                candidates.sort((a, b) => b.matchScore - a.matchScore);
+
+                return {
+                    best: candidates[0],
+                    candidates: candidates
+                };
+            } catch (error) {
+                console.error('Search error:', error);
+                return null;
+            }
+        }
+
+        async function getAlbumTracks(albumId) {
+            let allTrackIds = [];
+            let nextUrl = `https://api.spotify.com/v1/albums/${albumId}/tracks?limit=50`;
+
+            while (nextUrl) {
+                const response = await fetchWithRateLimit(nextUrl, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!response) {
+                    throw new Error('Failed to fetch album tracks');
+                }
+                const data = await response.json();
+                if (data.items) {
+                    allTrackIds.push(...data.items.map(t => t.id));
+                }
+                nextUrl = data.next;
+            }
+
+            // Get full track objects in batches of 50 to access popularity
+            let allTracks = [];
+            for (let i = 0; i < allTrackIds.length; i += 50) {
+                const batchIds = allTrackIds.slice(i, i + 50).join(',');
+                const tracksResponse = await fetchWithRateLimit(`https://api.spotify.com/v1/tracks?ids=${batchIds}`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!tracksResponse) {
+                    throw new Error('Failed to fetch track details');
+                }
+                const tracksData = await tracksResponse.json();
+                if (tracksData.tracks) {
+                    allTracks.push(...tracksData.tracks);
+                }
+            }
+
+            // Filter out tracks less than 30 seconds (30000 milliseconds)
+            return allTracks.filter(track => track && track.duration_ms >= 30000);
+        }
+
+        async function getPlaylistTracks(playlistId) {
+            const trackUris = new Set();
+            let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=next,items(track(uri))&limit=100`;
+
+            try {
+                while (nextUrl) {
+                    const response = await fetchWithRateLimit(nextUrl, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    if (!response) break; // Exit loop if auth failed
+                    const data = await response.json();
+
+                    data.items.forEach(item => {
+                        if (item.track) trackUris.add(item.track.uri);
+                    });
+                    nextUrl = data.next;
+                }
+            } catch (error) {
+                console.warn('Error fetching playlist tracks for duplication check:', error);
+            }
+            return trackUris;
+        }
+
+        async function addTracksToPlaylist(playlistId, trackUris) {
+            // Spotify API allows max 100 tracks per request
+            const batchSize = 100;
+
+            for (let i = 0; i < trackUris.length; i += batchSize) {
+                const batch = trackUris.slice(i, i + batchSize);
+
+                await fetchWithRateLimit(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ uris: batch })
+                });
+            }
+        }
+
+        // Old showStatus/showProgress functions replaced by addStatusMessage
+        function showStatus(message, type) {
+            addStatusMessage(message, type);
+        }
+
+        function clearStatus() {
+            const container = document.getElementById('status-area');
+            container.innerHTML = '';
+            container.classList.add('hidden');
+        }
+    </script>
+</body>
+
+</html>
