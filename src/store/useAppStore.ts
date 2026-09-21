@@ -13,8 +13,14 @@ interface AppState {
   // Auth & Profile
   accessToken: string | null;
   userProfile: UserProfile | null;
+  tokenExpiresAt: number | null;
+  storageType: 'local' | 'session';
+  isSessionExpiredModalOpen: boolean;
   setAccessToken: (token: string | null) => void;
   setUserProfile: (profile: UserProfile | null) => void;
+  setTokenExpiresAt: (expiresAt: number | null) => void;
+  setStorageType: (type: 'local' | 'session') => void;
+  setIsSessionExpiredModalOpen: (open: boolean) => void;
 
   // Playlists
   playlists: SimplifiedPlaylist[];
@@ -79,8 +85,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Auth
   accessToken: null,
   userProfile: null,
+  tokenExpiresAt: null,
+  storageType: (localStorage.getItem('spotify_storage_type') as 'local' | 'session') || 'local',
+  isSessionExpiredModalOpen: false,
   setAccessToken: token => set({ accessToken: token }),
   setUserProfile: profile => set({ userProfile: profile }),
+  setTokenExpiresAt: expiresAt => set({ tokenExpiresAt: expiresAt }),
+  setStorageType: type => {
+    localStorage.setItem('spotify_storage_type', type);
+    set({ storageType: type });
+  },
+  setIsSessionExpiredModalOpen: open => set({ isSessionExpiredModalOpen: open }),
 
   // Playlists
   playlists: [],

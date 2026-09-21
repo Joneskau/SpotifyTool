@@ -13,7 +13,8 @@ import {
   TrackObject,
 } from '../types/app';
 import { similarity, normalizeAlbumName, normalizeDashes } from '../utils/fuzzyMatch';
-import { refreshAccessToken, logout } from './spotifyAuth';
+import { refreshAccessToken } from './spotifyAuth';
+import { useAppStore } from '../store/useAppStore';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -47,7 +48,8 @@ export async function fetchWithRateLimit(
         newHeaders.set('Authorization', `Bearer ${newToken}`);
         return fetchWithRateLimit(url, { ...options, headers: newHeaders }, retries, onRateLimited);
       }
-      logout();
+      // Graceful handling: Open reconnect modal preserving work
+      useAppStore.getState().setIsSessionExpiredModalOpen(true);
       return null;
     }
 

@@ -4,6 +4,8 @@ import {
   getStoredValidToken,
   refreshAccessToken,
   exchangeCodeForToken,
+  getStoredTokenExpiry,
+  restoreSessionSnapshot,
 } from './services/spotifyAuth';
 import {
   getUserProfile,
@@ -17,7 +19,7 @@ import {
 import { asyncPool } from './utils/asyncPool';
 import { parseAlbumLine } from './utils/fuzzyMatch';
 import { calculatePlaylistTiers } from './utils/tiering';
-import { MatchedAlbum, FailedAlbum } from './types/app';
+import { MatchedAlbum, FailedAlbum, TieringOptions } from './types/app';
 
 import { Header } from './components/Header';
 import { AuthSection } from './components/AuthSection';
@@ -30,6 +32,7 @@ import { TierPreviewCards } from './components/TierPreviewCards';
 import { FailureSummary } from './components/FailureSummary';
 import { StatusLog } from './components/StatusLog';
 import { ToastContainer } from './components/ToastContainer';
+import { ReconnectModal } from './components/ReconnectModal';
 import { Footer } from './components/Footer';
 import { Search, Send, Edit3, Loader2 } from 'lucide-react';
 
@@ -37,12 +40,17 @@ export const App: React.FC = () => {
   const {
     accessToken,
     setAccessToken,
+    setTokenExpiresAt,
+    setStorageType,
     setUserProfile,
     setPlaylists,
     setIsLoadingPlaylists,
     selectedPlaylistId,
+    setSelectedPlaylistId,
     newPlaylistName,
+    setNewPlaylistName,
     albumListText,
+    setAlbumListText,
     isProcessing,
     setIsProcessing,
     setIsCancelled,
@@ -54,6 +62,7 @@ export const App: React.FC = () => {
     existingTrackUris,
     setExistingTrackUris,
     tierOptions,
+    setTierOptions,
     addStatusLog,
     addToast,
     resetToSearch,
@@ -63,6 +72,27 @@ export const App: React.FC = () => {
 
   // 1. Check for tokens or auth code on mount
   useEffect(() => {
+    const handleRestoreSnapshot = () => {
+      const snapshot = restoreSessionSnapshot<{
+        albumListText?: string;
+        matchedAlbums?: MatchedAlbum[];
+        selectedPlaylistId?: string;
+        newPlaylistName?: string;
+        tierOptions?: TieringOptions;
+        storageType?: 'local' | 'session';
+      }>();
+
+      if (snapshot) {
+        if (snapshot.albumListText) setAlbumListText(snapshot.albumListText);
+        if (snapshot.matchedAlbums) setMatchedAlbums(snapshot.matchedAlbums);
+        if (snapshot.selectedPlaylistId) setSelectedPlaylistId(snapshot.selectedPlaylistId);
+        if (snapshot.newPlaylistName) setNewPlaylistName(snapshot.newPlaylistName);
+        if (snapshot.tierOptions) setTierOptions(snapshot.tierOptions);
+        if (snapshot.storageType) setStorageType(snapshot.storageType);
+        addToast('Session restored! Preserved your album list and matches.', 'success');
+      }
+    };
+
     const initAuth = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
@@ -72,6 +102,8 @@ export const App: React.FC = () => {
           addToast('Exchanging authorization code for token...', 'info');
           const token = await exchangeCodeForToken(code);
           setAccessToken(token);
+          setTokenExpiresAt(getStoredTokenExpiry());
+          handleRestoreSnapshot();
           window.history.replaceState({}, document.title, window.location.pathname);
           return;
         } catch (err: unknown) {
@@ -83,16 +115,28 @@ export const App: React.FC = () => {
       const storedToken = getStoredValidToken();
       if (storedToken) {
         setAccessToken(storedToken);
+        setTokenExpiresAt(getStoredTokenExpiry());
       } else {
         const refreshed = await refreshAccessToken();
         if (refreshed) {
           setAccessToken(refreshed);
+          setTokenExpiresAt(getStoredTokenExpiry());
         }
       }
     };
 
     initAuth();
-  }, [setAccessToken, addToast]);
+  }, [
+    setAccessToken,
+    setTokenExpiresAt,
+    setStorageType,
+    setAlbumListText,
+    setMatchedAlbums,
+    setSelectedPlaylistId,
+    setNewPlaylistName,
+    setTierOptions,
+    addToast,
+  ]);
 
   // 2. Load profile and playlists when token is established
   useEffect(() => {
@@ -443,6 +487,7 @@ export const App: React.FC = () => {
 
       <Footer />
       <ToastContainer />
+      <ReconnectModal />
     </div>
   );
 };
