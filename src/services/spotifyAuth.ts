@@ -87,7 +87,12 @@ export function setStorageType(type: StorageType): void {
 }
 
 export function getActiveStorage(): Storage {
-  return getStorageType() === 'session' ? window.sessionStorage : window.localStorage;
+  if (typeof window === 'undefined') {
+    return typeof localStorage !== 'undefined' ? localStorage : ({} as Storage);
+  }
+  return getStorageType() === 'session'
+    ? (window.sessionStorage || window.localStorage)
+    : (window.localStorage || window.sessionStorage);
 }
 
 export function getRedirectUri(): string {

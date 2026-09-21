@@ -6,11 +6,13 @@ import { X, Search, Loader2, Disc, AlertTriangle, AlertCircle } from 'lucide-rea
 interface ManualSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  albumIndex: number;
-  matchedAlbum: MatchedAlbum;
-  allMatchedAlbums: MatchedAlbum[];
+  albumIndex?: number;
+  matchedAlbum?: MatchedAlbum | null;
+  initialQuery?: string;
+  allMatchedAlbums?: MatchedAlbum[];
   token: string;
-  onSelectReplacement: (albumIndex: number, candidate: ScoredCandidate) => Promise<void>;
+  onSelectReplacement?: (albumIndex: number, candidate: ScoredCandidate) => Promise<void>;
+  onSelectNewCandidate?: (candidate: ScoredCandidate) => Promise<void>;
 }
 
 export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
@@ -18,9 +20,11 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
   onClose,
   albumIndex,
   matchedAlbum,
-  allMatchedAlbums,
+  initialQuery,
+  allMatchedAlbums = [],
   token,
   onSelectReplacement,
+  onSelectNewCandidate,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -33,15 +37,19 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Initialize query from matchedAlbum on open
+  // Initialize query from matchedAlbum or initialQuery on open
   useEffect(() => {
     if (isOpen) {
-      setQuery(`${matchedAlbum.artist} ${matchedAlbum.album.name}`.trim());
+      if (matchedAlbum) {
+        setQuery(`${matchedAlbum.artist} ${matchedAlbum.album.name}`.trim());
+      } else if (initialQuery) {
+        setQuery(initialQuery.trim());
+      }
       setResults([]);
       setHasSearched(false);
       setErrorMessage(null);
     }
-  }, [isOpen, matchedAlbum]);
+  }, [isOpen, matchedAlbum, initialQuery]);
 
   // Focus trap & Escape key listener
   useEffect(() => {
@@ -119,10 +127,14 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
     setErrorMessage(null);
 
     try {
-      await onSelectReplacement(albumIndex, candidate);
+      if (matchedAlbum && onSelectReplacement && albumIndex !== undefined) {
+        await onSelectReplacement(albumIndex, candidate);
+      } else if (onSelectNewCandidate) {
+        await onSelectNewCandidate(candidate);
+      }
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to replace album match';
+      const msg = err instanceof Error ? err.message : 'Failed to select album';
       setErrorMessage(msg);
     } finally {
       setReplacingId(null);
@@ -147,10 +159,14 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
           <div>
             <h2 id="manual-search-title" className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
               <Search size={18} className="text-spotify-green" />
-              <span>Manual Match Override</span>
+              <span>{matchedAlbum ? 'Manual Match Override' : 'Manual Album Search'}</span>
             </h2>
             <p className="text-xs text-spotify-light-gray mt-0.5">
-              Original input: <span className="font-mono text-white/90">"{matchedAlbum.originalInput}"</span>
+              {matchedAlbum ? (
+                <>Original input: <span className="font-mono text-white/90">"{matchedAlbum.originalInput}"</span></>
+              ) : (
+                <>Search Spotify catalog directly to find and add the album.</>
+              )}
             </p>
           </div>
           <button
@@ -217,7 +233,7 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
 
           {!isSearching &&
             results.map((candidate, idx) => {
-              const isCurrentlyMatched = candidate.id === matchedAlbum.album.id;
+              const isCurrentlyMatched = candidate.id === matchedAlbum?.album?.id;
               const isReplacingThis = replacingId === candidate.id;
               const matchedOnOtherLine = allMatchedAlbums.some(
                 (m, i) => i !== albumIndex && m.album.id === candidate.id

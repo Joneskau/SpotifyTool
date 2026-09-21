@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { searchAlbumWithStrategies, getAlbumTracks } from '../services/spotifyApi';
-import { AlertCircle, RotateCcw, X, Copy, Check, Play } from 'lucide-react';
+import { HEADLINE_NOT_FOUND } from '../utils/errorFeedback';
+import { AlertCircle, RotateCcw, X, Copy, Check, Play, Search } from 'lucide-react';
 
 interface FailureSummaryProps {
   onResumePublish?: () => void;
+  onOpenManualSearch?: (failedIndex: number, query: string) => void;
 }
 
-export const FailureSummary: React.FC<FailureSummaryProps> = ({ onResumePublish }) => {
+export const FailureSummary: React.FC<FailureSummaryProps> = ({
+  onResumePublish,
+  onOpenManualSearch,
+}) => {
   const {
     failedAlbums,
     publishFailures,
@@ -251,6 +256,18 @@ export const FailureSummary: React.FC<FailureSummaryProps> = ({ onResumePublish 
                         </select>
                       )}
 
+                      {onOpenManualSearch && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenManualSearch(index, currentQuery)}
+                          className="px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white font-medium flex items-center gap-1 transition-colors"
+                          title="Open manual search modal"
+                        >
+                          <Search size={12} />
+                          <span>Edit query</span>
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleRetrySingle(index)}
                         disabled={retryingIndex === index}
@@ -275,8 +292,12 @@ export const FailureSummary: React.FC<FailureSummaryProps> = ({ onResumePublish 
 
                   {/* Failure reason explanation */}
                   <div className="text-[11px] text-red-300/80 flex items-center gap-1.5">
-                    <span className="font-semibold text-red-400">Reason:</span>
-                    <span>{failed.reason}</span>
+                    <span className="font-semibold text-red-400">
+                      {failed.status === 'not_found' ? 'Not Found:' : 'Search Failed:'}
+                    </span>
+                    <span>
+                      {failed.status === 'not_found' ? HEADLINE_NOT_FOUND : failed.reason}
+                    </span>
                   </div>
                 </div>
               );

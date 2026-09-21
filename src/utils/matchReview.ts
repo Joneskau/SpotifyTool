@@ -1,4 +1,5 @@
 import { TrackObject } from '../types/app';
+import { HEADLINE_MARKET } from './errorFeedback';
 
 /**
  * Format total duration into human-readable string.
@@ -54,7 +55,7 @@ export function getPlayabilityWarning(tracks?: TrackObject[]): string | null {
   );
 
   if (hasUnplayable) {
-    return 'Unavailable in your region';
+    return HEADLINE_MARKET;
   }
 
   return null;

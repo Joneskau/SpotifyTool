@@ -29,6 +29,16 @@ import {
   PublishSession,
 } from './types/app';
 
+import { StatusCenter } from './components/StatusCenter';
+import { ManualSearchModal } from './components/ManualSearchModal';
+import {
+  SPOTIFY_PLAYLIST_TRACK_LIMIT,
+  HEADLINE_NOT_FOUND,
+  HEADLINE_PLAYLIST_TOO_LARGE,
+  formatActionableFeedback,
+} from './utils/errorFeedback';
+import { SpotifyApiError } from './services/spotifyError';
+import { ScoredCandidate } from './types/app';
 import { Header } from './components/Header';
 import { AuthSection } from './components/AuthSection';
 import { PlaylistSelector } from './components/PlaylistSelector';
@@ -91,10 +101,19 @@ export const App: React.FC = () => {
     setTierOptions,
     addStatusLog,
     addToast,
+    removeFailedAlbum,
+    setIsSessionExpiredModalOpen,
     resetToSearch,
+    setSessionError,
+    addEventLog,
   } = useAppStore();
 
   const [isCommitting, setIsCommitting] = useState(false);
+  const [manualSearchState, setManualSearchState] = useState<{
+    isOpen: boolean;
+    failedIndex?: number;
+    query: string;
+  }>({ isOpen: false, query: '' });
 
 
   // 1. Check for tokens or auth code on mount
@@ -338,7 +357,12 @@ export const App: React.FC = () => {
         searchedCount++;
 
         if (!searchResult || searchResult.candidates.length === 0) {
-          addStatusLog(`❌ Not found: ${artist} - ${albumName}`, 'error');
+          addStatusLog(`⚠️ Not found: ${artist} - ${albumName}`, 'error');
+          addEventLog({
+            severity: 'warning',
+            itemLabel: `${artist} - ${albumName}`,
+            message: HEADLINE_NOT_FOUND,
+          });
           failedCount++;
           setProgress(searchedCount, total, `${artist} - ${albumName}`);
           setDetailedProgress({
@@ -351,7 +375,7 @@ export const App: React.FC = () => {
             line,
             artist,
             albumName,
-            reason: 'Not found on Spotify',
+            reason: HEADLINE_NOT_FOUND,
           };
         }
 
@@ -367,6 +391,11 @@ export const App: React.FC = () => {
         matchedCount++;
 
         addStatusLog(`✅ Found: ${best.name} - ${artist}`, 'success');
+        addEventLog({
+          severity: 'success',
+          itemLabel: `${artist} - ${best.name}`,
+          message: `Matched with ${(best.matchScore ? best.matchScore * 100 : 100).toFixed(0)}% confidence (${tracks.length} tracks).`,
+        });
         setProgress(searchedCount, total, `${artist} - ${best.name}`);
         setDetailedProgress({
           searching: { current: searchedCount, total },
@@ -387,18 +416,45 @@ export const App: React.FC = () => {
           matchSource: 'auto' as const,
         };
       } catch (err: unknown) {
-        const reason = err instanceof Error ? err.message : 'API error';
-        addStatusLog(`❌ Error: ${artist} - ${albumName} (${reason})`, 'error');
         searchedCount++;
         failedCount++;
+
+        const isSessionLevel =
+          err instanceof SpotifyApiError &&
+          (err.kind === 'session_expired' ||
+            err.kind === 'forbidden_scope' ||
+            err.kind === 'forbidden_not_registered' ||
+            err.kind === 'rate_limited' ||
+            err.kind === 'network');
+
+        if (isSessionLevel) {
+          const feedback = formatActionableFeedback(err);
+          setSessionError(feedback);
+          setIsCancelled(true);
+          addEventLog({
+            severity: 'error',
+            itemLabel: 'Session Alert',
+            message: feedback.title,
+          });
+        }
+
+        const reason = err instanceof Error ? err.message : 'Search failed';
+        addStatusLog(`❌ Search Failed: ${artist} - ${albumName} (${reason})`, 'error');
+        addEventLog({
+          severity: 'error',
+          itemLabel: `${artist} - ${albumName}`,
+          message: reason,
+        });
+
         setProgress(searchedCount, total, `${artist} - ${albumName}`);
         setDetailedProgress({
           searching: { current: searchedCount, total },
           failedCount,
           currentItem: `${artist} - ${albumName}`,
         });
+
         return {
-          status: 'error' as const,
+          status: 'search_failed' as const,
           line,
           artist,
           albumName,
@@ -421,6 +477,7 @@ export const App: React.FC = () => {
           localMatched.push(val as MatchedAlbum);
         } else if (
           val.status === 'not_found' ||
+          val.status === 'search_failed' ||
           val.status === 'error' ||
           val.status === 'skipped'
         ) {
@@ -494,8 +551,9 @@ export const App: React.FC = () => {
         // Re-check 10,000 track limit for target playlist before sending batch
         try {
           const details = await getPlaylistDetails(targetPlaylistId, accessToken);
-          if (details.tracks.total + batch.trackUris.length > 10000) {
-            const limitMsg = `Target playlist "${playlistName}" would exceed Spotify's 10,000 track limit (currently has ${details.tracks.total} tracks).`;
+          if (details.tracks.total + batch.trackUris.length > SPOTIFY_PLAYLIST_TRACK_LIMIT) {
+            const limitMsg = HEADLINE_PLAYLIST_TOO_LARGE;
+            const detailMsg = `Adding ${batch.trackUris.length} tracks would reach ${details.tracks.total + batch.trackUris.length} of ${SPOTIFY_PLAYLIST_TRACK_LIMIT} max tracks.`;
             addPublishFailure({
               id: Math.random().toString(36).slice(2),
               batchId: batch.id,
@@ -504,11 +562,16 @@ export const App: React.FC = () => {
               playlistName,
               trackCount: batch.trackUris.length,
               trackNames: batch.trackNames,
-              reason: limitMsg,
+              reason: `${limitMsg} (${detailMsg})`,
               timestamp: Date.now(),
             });
             pausePublishSession(limitMsg);
             addToast(limitMsg, 'error');
+            addEventLog({
+              severity: 'error',
+              itemLabel: playlistName,
+              message: `${limitMsg} ${detailMsg}`,
+            });
             setIsCommitting(false);
             return;
           }
@@ -527,7 +590,7 @@ export const App: React.FC = () => {
           accessToken,
           {
             signal: abortController.signal,
-            onRateLimited: msg => addStatusLog(msg, 'info'),
+            onRateLimited: msg => addStatusLog(String(msg), 'info'),
           }
         );
 
@@ -537,9 +600,21 @@ export const App: React.FC = () => {
             `Added batch ${batch.batchIndex + 1} (${batch.trackUris.length} tracks) to "${playlistName}"${result.reconciled ? ' [Reconciled]' : ''}`,
             'success'
           );
+          addEventLog({
+            severity: 'success',
+            itemLabel: playlistName,
+            message: `Added batch ${batch.batchIndex + 1} (${batch.trackUris.length} tracks).`,
+          });
         } else {
           // Batch failed! Halt sequentially, mark paused, and preserve session state
-          updatePublishBatch(batch.id, { status: 'failed', error: result.error });
+          const feedback = formatActionableFeedback(result.errorKind || result.error);
+          const errorReason = feedback.title;
+
+          if (result.errorKind === 'session_expired' || result.errorKind === 'forbidden_scope') {
+            setSessionError(feedback);
+          }
+
+          updatePublishBatch(batch.id, { status: 'failed', error: errorReason });
           addPublishFailure({
             id: Math.random().toString(36).slice(2),
             batchId: batch.id,
@@ -548,17 +623,18 @@ export const App: React.FC = () => {
             playlistName,
             trackCount: batch.trackUris.length,
             trackNames: batch.trackNames,
-            reason: result.error || 'Failed to add tracks',
+            reason: errorReason,
             status: result.status,
             timestamp: Date.now(),
           });
-          const pauseReason = result.error || 'Batch addition failed';
-          pausePublishSession(pauseReason);
-          addToast(
-            `Publishing paused: ${pauseReason}. Click "Resume Publishing" to continue.`,
-            'error'
-          );
-          addStatusLog(`Publishing paused at batch ${bIndex + 1}: ${pauseReason}`, 'error');
+          pausePublishSession(errorReason);
+          addToast(errorReason, 'error');
+          addStatusLog(`Publishing paused: ${errorReason}`, 'error');
+          addEventLog({
+            severity: 'error',
+            itemLabel: playlistName,
+            message: `Batch ${batch.batchIndex + 1} failed: ${errorReason}`,
+          });
           setIsCommitting(false);
           return;
         }
@@ -671,11 +747,13 @@ export const App: React.FC = () => {
       const targetPlaylist = useAppStore.getState().playlists.find(p => p.id === selectedExistingPlaylistId);
       const currentCount = targetPlaylist?.tracks?.total || 0;
       const tier0Tracks = tiers[0]?.tracks.length || 0;
-      if (currentCount + tier0Tracks > 10000) {
-        addToast(
-          `Blocked: Adding ${tier0Tracks} tracks exceeds Spotify's 10,000 limit (${currentCount} current + ${tier0Tracks} new = ${currentCount + tier0Tracks}).`,
-          'error'
-        );
+      if (currentCount + tier0Tracks > SPOTIFY_PLAYLIST_TRACK_LIMIT) {
+        addToast(HEADLINE_PLAYLIST_TOO_LARGE, 'error');
+        addEventLog({
+          severity: 'error',
+          itemLabel: 'Playlist Limit',
+          message: `${HEADLINE_PLAYLIST_TOO_LARGE} (Adding ${tier0Tracks} tracks would reach ${currentCount + tier0Tracks} of ${SPOTIFY_PLAYLIST_TRACK_LIMIT}).`,
+        });
         return;
       }
     }
@@ -765,6 +843,51 @@ export const App: React.FC = () => {
     await runPublishExecution(unpausedSession);
   };
 
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleSelectFromManualSearch = async (candidate: ScoredCandidate) => {
+    if (!accessToken) return;
+
+    try {
+      const tracks = await getAlbumTracks(candidate.id, accessToken);
+      const artistName = candidate.artists.map(a => a.name).join(', ');
+      const newMatch: MatchedAlbum = {
+        status: 'found',
+        originalInput:
+          manualSearchState.query || `${artistName} - ${candidate.name}`,
+        artist: artistName,
+        album: candidate,
+        candidates: [candidate],
+        trackUris: tracks.map((t: { uri: string }) => t.uri),
+        trackObjects: tracks,
+        confidence: 1,
+        matchSource: 'manual',
+        selected: true,
+      };
+
+      setMatchedAlbums([...useAppStore.getState().matchedAlbums, newMatch]);
+
+      if (manualSearchState.failedIndex !== undefined) {
+        removeFailedAlbum(manualSearchState.failedIndex);
+      }
+
+      setManualSearchState({ isOpen: false, query: '' });
+      addToast(`Added: ${candidate.name}!`, 'success');
+      addEventLog({
+        severity: 'success',
+        itemLabel: `${artistName} - ${candidate.name}`,
+        message: `Manually added (${tracks.length} tracks).`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to add manual candidate';
+      addToast(msg, 'error');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#121212] text-white flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 font-sans transition-colors">
@@ -802,6 +925,15 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
+              {/* Status Center (Persistent) */}
+              <StatusCenter
+                onFilterWarnings={() => scrollToSection('confirmation-list-section')}
+                onFilterErrors={() => scrollToSection('failure-summary-section')}
+                onFilterDuplicates={() => scrollToSection('confirmation-list-section')}
+                onReconnect={() => setIsSessionExpiredModalOpen(true)}
+                onResumePublish={handleResumePublish}
+              />
+
               {/* Progress Banner */}
               <ProgressBanner
                 onResumePublish={handleResumePublish}
@@ -810,7 +942,10 @@ export const App: React.FC = () => {
 
               {/* Review & Confirmation Step */}
               {matchedAlbums.length > 0 && (
-                <div className="space-y-6 bg-[#181818] border border-white/10 rounded-2xl p-4 sm:p-6 shadow-xl animate-in fade-in duration-300">
+                <div
+                  id="confirmation-list-section"
+                  className="space-y-6 bg-[#181818] border border-white/10 rounded-2xl p-4 sm:p-6 shadow-xl animate-in fade-in duration-300"
+                >
                   <ConfirmationList />
                   <TieringControls />
                   <TierPreviewCards />
@@ -865,8 +1000,14 @@ export const App: React.FC = () => {
               )}
 
               {/* Failed Items Resolution */}
-              <FailureSummary onResumePublish={handleResumePublish} />
-
+              <div id="failure-summary-section">
+                <FailureSummary
+                  onResumePublish={handleResumePublish}
+                  onOpenManualSearch={(failedIndex, query) => {
+                    setManualSearchState({ isOpen: true, failedIndex, query });
+                  }}
+                />
+              </div>
 
               {/* Live Status Console */}
               <StatusLog />
@@ -878,6 +1019,15 @@ export const App: React.FC = () => {
       <Footer />
       <ToastContainer />
       <ReconnectModal />
+      {manualSearchState.isOpen && (
+        <ManualSearchModal
+          isOpen={manualSearchState.isOpen}
+          onClose={() => setManualSearchState({ isOpen: false, query: '' })}
+          initialQuery={manualSearchState.query}
+          token={accessToken || ''}
+          onSelectNewCandidate={handleSelectFromManualSearch}
+        />
+      )}
     </div>
   );
 };

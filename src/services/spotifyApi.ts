@@ -17,6 +17,8 @@ import {
 import { similarity, normalizeAlbumName, normalizeDashes } from '../utils/fuzzyMatch';
 import { refreshAccessToken } from './spotifyAuth';
 import { useAppStore } from '../store/useAppStore';
+import { SpotifyApiError, classifySpotifyResponse, SpotifyApiErrorKind } from './spotifyError';
+import { getActiveFault, simulateFaultResponse } from './faultInjection';
 
 // Shared module-level rate-limit gate
 let rateLimitBlockedUntil = 0;
@@ -62,38 +64,76 @@ export const cancellableDelay = (ms: number, signal?: AbortSignal | null): Promi
     }
   });
 
+export interface RetryEvent {
+  waitMs: number;
+  attempt: number;
+  maxRetries: number;
+  retryAfterSeconds?: number;
+  status: number;
+  reason: 'rate_limit' | 'server_error' | 'network';
+  message: string;
+}
+
 export async function fetchWithRateLimit(
   url: string,
   options: RequestInit = {},
   retries = 3,
-  onRateLimited?: (msg: string) => void,
+  onRateLimited?: (eventOrMsg: string | RetryEvent) => void,
   attempt = 0
 ): Promise<Response | null> {
   if (options.signal?.aborted) {
     throw new DOMException('Aborted', 'AbortError');
   }
 
+  // Helper to notify retry listeners with structured event
+  const notifyRetry = (ev: RetryEvent) => {
+    if (!onRateLimited) return;
+    const structuredEv = Object.assign(ev, {
+      toString: () => ev.message,
+    });
+    (onRateLimited as (arg: RetryEvent) => void)(structuredEv);
+  };
+
+  // Check dev fault injection
+  const fault = getActiveFault();
+  if (fault === 'network') {
+    throw new TypeError('Failed to fetch (simulated network fault)');
+  }
+
   // Check shared rate-limit gate
   const now = Date.now();
-  if (rateLimitBlockedUntil > now) {
+  if (!fault && rateLimitBlockedUntil > now) {
     const waitTime = rateLimitBlockedUntil - now;
-    onRateLimited?.(`⏳ Rate limit gate active. Pausing for ${(waitTime / 1000).toFixed(1)}s...`);
+    notifyRetry({
+      waitMs: waitTime,
+      attempt: attempt + 1,
+      maxRetries: retries,
+      status: 429,
+      reason: 'rate_limit',
+      message: `Rate limit gate active. Pausing for ${(waitTime / 1000).toFixed(1)}s...`,
+    });
     await cancellableDelay(waitTime, options.signal);
   }
 
   try {
-    const response = await fetch(url, options);
+    const response = fault ? simulateFaultResponse(fault) : await fetch(url, options);
 
     // 429 Too Many Requests
     if (response.status === 429) {
       const retryAfter = response.headers.get('Retry-After');
       let waitTime: number;
+      let seconds: number | undefined;
 
       if (retryAfter && !isNaN(parseInt(retryAfter, 10))) {
-        const seconds = parseInt(retryAfter, 10);
+        seconds = parseInt(retryAfter, 10);
         if (seconds > 60) {
           setRateLimitBlockedUntil(Date.now() + seconds * 1000);
-          const err = new Error(`Rate limit wait exceeds 60s (${seconds}s required). Paused.`);
+          const err = new SpotifyApiError({
+            kind: 'rate_limited',
+            status: 429,
+            message: `Rate limit wait exceeds 60s (${seconds}s required). Paused.`,
+            retryAfterMs: seconds * 1000,
+          });
           (err as unknown as { isRateLimitExceeded: boolean }).isRateLimitExceeded = true;
           (err as unknown as { retryAfter: number }).retryAfter = seconds;
           throw err;
@@ -106,24 +146,41 @@ export async function fetchWithRateLimit(
       setRateLimitBlockedUntil(Date.now() + waitTime);
 
       if (retries > 0) {
-        onRateLimited?.(
-          `⏳ Rate limited (429). Retrying in ${(waitTime / 1000).toFixed(1)}s (attempt ${attempt + 1})...`
-        );
+        notifyRetry({
+          waitMs: waitTime,
+          attempt: attempt + 1,
+          maxRetries: retries,
+          retryAfterSeconds: seconds,
+          status: 429,
+          reason: 'rate_limit',
+          message: `Spotify is rate-limiting requests. The app will retry automatically in ${(waitTime / 1000).toFixed(1)}s (attempt ${attempt + 1})...`,
+        });
         await cancellableDelay(waitTime, options.signal);
         return fetchWithRateLimit(url, options, retries - 1, onRateLimited, attempt + 1);
       }
 
-      onRateLimited?.('❌ Rate limit exceeded. Maximum retries reached.');
-      return response;
+      const err = new SpotifyApiError({
+        kind: 'rate_limited',
+        status: 429,
+        message: 'Rate limit exceeded. Maximum retries reached.',
+        retryAfterMs: waitTime,
+      });
+      (err as unknown as { isRateLimitExceeded: boolean }).isRateLimitExceeded = true;
+      throw err;
     }
 
     // 5xx Server Errors (500, 502, 503, 504)
     if (response.status >= 500 && response.status <= 599) {
       if (retries > 0) {
         const waitTime = calculateBackoff(attempt, 1000, 20000, 400);
-        onRateLimited?.(
-          `⏳ Server error (${response.status}). Retrying in ${(waitTime / 1000).toFixed(1)}s (attempt ${attempt + 1})...`
-        );
+        notifyRetry({
+          waitMs: waitTime,
+          attempt: attempt + 1,
+          maxRetries: retries,
+          status: response.status,
+          reason: 'server_error',
+          message: `Server error (${response.status}). Retrying in ${(waitTime / 1000).toFixed(1)}s (attempt ${attempt + 1})...`,
+        });
         await cancellableDelay(waitTime, options.signal);
         return fetchWithRateLimit(url, options, retries - 1, onRateLimited, attempt + 1);
       }
@@ -146,7 +203,11 @@ export async function fetchWithRateLimit(
       }
       // Graceful handling: Open reconnect modal preserving work
       useAppStore.getState().setIsSessionExpiredModalOpen(true);
-      return null;
+      throw new SpotifyApiError({
+        kind: 'session_expired',
+        status: 401,
+        message: 'Your Spotify session expired. Reconnect to continue.',
+      });
     }
 
     // Non-retryable client errors: 400, 403, 404, etc. Return immediately.
@@ -155,30 +216,65 @@ export async function fetchWithRateLimit(
     if (
       (error instanceof DOMException && error.name === 'AbortError') ||
       (error as { name?: string }).name === 'AbortError' ||
-      (error as { isRateLimitExceeded?: boolean }).isRateLimitExceeded
+      (error as { isRateLimitExceeded?: boolean }).isRateLimitExceeded ||
+      error instanceof SpotifyApiError ||
+      (error as { name?: string })?.name === 'SpotifyApiError' ||
+      (error as { kind?: string })?.kind !== undefined
     ) {
       throw error;
     }
 
     if (retries > 0) {
       const waitTime = calculateBackoff(attempt, 1000, 20000, 400);
-      onRateLimited?.(
-        `⏳ Network error. Retrying in ${(waitTime / 1000).toFixed(1)}s (attempt ${attempt + 1})...`
-      );
+      notifyRetry({
+        waitMs: waitTime,
+        attempt: attempt + 1,
+        maxRetries: retries,
+        status: 0,
+        reason: 'network',
+        message: `Network error. Retrying in ${(waitTime / 1000).toFixed(1)}s (attempt ${attempt + 1})...`,
+      });
       await cancellableDelay(waitTime, options.signal);
       return fetchWithRateLimit(url, options, retries - 1, onRateLimited, attempt + 1);
     }
-    throw error;
+
+    throw new SpotifyApiError({
+      kind: 'network',
+      status: 0,
+      message: error instanceof Error ? error.message : 'Network error during request',
+    });
   }
 }
 
+
+async function handleApiError(
+  response: Response | null,
+  fallbackMessage: string
+): Promise<never> {
+  if (!response) {
+    throw new SpotifyApiError({
+      kind: 'session_expired',
+      status: 401,
+      message: 'Your Spotify session expired. Reconnect to continue.',
+    });
+  }
+  const bodyText = await response.text().catch(() => '');
+  const classified = classifySpotifyResponse(response.status, bodyText, response.headers);
+  throw new SpotifyApiError({
+    kind: classified.kind,
+    status: response.status,
+    message: classified.bodyMessage || `${fallbackMessage} (${response.status})`,
+    bodyMessage: classified.bodyMessage,
+    retryAfterMs: classified.retryAfterMs,
+  });
+}
 
 export async function getUserProfile(token: string): Promise<UserProfile> {
   const response = await fetchWithRateLimit('https://api.spotify.com/v1/me', {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response || !response.ok) {
-    throw new Error('Failed to load user profile');
+    return handleApiError(response, 'Failed to load user profile');
   }
   const json = await response.json();
   const parsed = SpotifyUserSchema.parse(json);
@@ -198,7 +294,7 @@ export async function getUserPlaylists(token: string): Promise<SimplifiedPlaylis
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response || !response.ok) {
-      throw new Error('Failed to load playlists');
+      return handleApiError(response, 'Failed to load playlists');
     }
     const json = await response.json();
     const paging = SpotifyPagingResponseSchema(SpotifyPlaylistSimplifiedSchema).parse(json);
@@ -252,7 +348,7 @@ export async function getPlaylistTracks(
       signal: options?.signal,
     });
     if (!response || !response.ok) {
-      throw new Error(`Failed to fetch playlist tracks (${response?.status || 'Network error'})`);
+      return handleApiError(response, 'Failed to fetch playlist tracks');
     }
     const data = await response.json();
 
@@ -294,7 +390,7 @@ export async function getAlbumTracks(
       3
     );
     if (!response || !response.ok) {
-      throw new Error('Failed to fetch album tracks');
+      return handleApiError(response, 'Failed to fetch album tracks');
     }
     const data = await response.json();
     const paging = SpotifyPagingResponseSchema(SpotifyTrackSimplifiedSchema).parse(data);
@@ -316,7 +412,7 @@ export async function getAlbumTracks(
       3
     );
     if (!tracksResponse || !tracksResponse.ok) {
-      throw new Error('Failed to fetch track details');
+      return handleApiError(tracksResponse, 'Failed to fetch track details');
     }
     const tracksData = await tracksResponse.json();
     if (tracksData.tracks && Array.isArray(tracksData.tracks)) {
@@ -351,7 +447,9 @@ export async function searchAlbumWithStrategies(
         `https://api.spotify.com/v1/search?q=${encodeURIComponent(normalizedQuery)}&type=album&limit=10&market=from_token`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (!response || !response.ok) return null;
+      if (!response || !response.ok) {
+        return handleApiError(response, 'Spotify search error');
+      }
 
       const raw = await response.json();
       const parsed = SpotifySearchAlbumsResponseSchema.parse(raw);
@@ -419,8 +517,17 @@ export async function searchAlbumWithStrategies(
         candidates,
       };
     } catch (err) {
-      console.error('Spotify search error:', err);
-      return null;
+      if (
+        err instanceof SpotifyApiError ||
+        (err instanceof DOMException && err.name === 'AbortError') ||
+        (err as { name?: string })?.name === 'AbortError'
+      ) {
+        throw err;
+      }
+      throw new SpotifyApiError({
+        kind: 'invalid_response',
+        message: err instanceof Error ? err.message : 'Invalid response from Spotify search',
+      });
     }
   };
 
@@ -581,7 +688,7 @@ export async function createNewPlaylist(
   }
 
   if (!response || !response.ok) {
-    throw new Error(`Failed to create playlist "${name}"`);
+    return handleApiError(response, `Failed to create playlist "${name}"`);
   }
 
   const data = await response.json();
@@ -632,9 +739,7 @@ export async function getPlaylistDetails(
     }
   );
   if (!response || !response.ok) {
-    throw new Error(
-      `Failed to fetch playlist details for ${playlistId} (${response?.status || 'Network error'})`
-    );
+    return handleApiError(response, `Failed to fetch playlist details for ${playlistId}`);
   }
   const json = await response.json();
   const parsed = SpotifyPlaylistDetailsSchema.parse(json);
@@ -654,6 +759,7 @@ export interface BatchAddResult {
   reconciled?: boolean;
   error?: string;
   status?: number;
+  errorKind?: SpotifyApiErrorKind;
 }
 
 export async function addTracksBatchWithReconciliation(
@@ -662,7 +768,7 @@ export async function addTracksBatchWithReconciliation(
   token: string,
   options?: {
     signal?: AbortSignal;
-    onRateLimited?: (msg: string) => void;
+    onRateLimited?: (eventOrMsg: string | RetryEvent) => void;
   }
 ): Promise<BatchAddResult> {
   if (trackUris.length === 0) {
@@ -724,10 +830,15 @@ export async function addTracksBatchWithReconciliation(
 
     const status = response?.status;
     const errorBody = response ? await response.text().catch(() => '') : '';
+    const classified = status
+      ? classifySpotifyResponse(status, errorBody, response?.headers)
+      : { kind: 'network' as const, bodyMessage: errorBody };
+
     return {
       success: false,
       status,
-      error: `HTTP ${status || 'Network Error'}: ${errorBody || 'Failed to add tracks'}`,
+      errorKind: classified.kind,
+      error: classified.bodyMessage || errorBody || `HTTP ${status || 'Network Error'}: Failed to add tracks`,
       tracksAdded: 0,
     };
   } catch (err: unknown) {
@@ -752,9 +863,12 @@ export async function addTracksBatchWithReconciliation(
     }
 
     const msg = err instanceof Error ? err.message : 'Unknown error during batch addition';
+    const errorKind = err instanceof SpotifyApiError ? err.kind : 'network';
     return {
       success: false,
       error: msg,
+      errorKind,
+      status: err instanceof SpotifyApiError ? err.status : undefined,
       tracksAdded: 0,
     };
   }
@@ -767,7 +881,7 @@ export async function addTracksToPlaylist(
   options?: {
     signal?: AbortSignal;
     onProgress?: (batchIndex: number, totalBatches: number, tracksAddedSoFar: number) => void;
-    onRateLimited?: (msg: string) => void;
+    onRateLimited?: (eventOrMsg: string | RetryEvent) => void;
   }
 ): Promise<{ snapshot_id?: string; totalAdded: number }> {
   const batchSize = 100;

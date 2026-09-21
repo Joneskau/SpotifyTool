@@ -12,7 +12,12 @@ import {
   PublishSession,
   PublishFailure,
   TargetPlaylistMode,
+  StatusMetrics,
+  EventLogItem,
 } from '../types/app';
+import { ActionableFeedback } from '../utils/errorFeedback';
+import { calculatePlaylistTiers } from '../utils/tiering';
+import { getPlayabilityWarning } from '../utils/matchReview';
 
 const INITIAL_DETAILED_PROGRESS: DetailedProgress = {
   stage: 'idle',
@@ -147,6 +152,11 @@ interface AppState {
   // Status & Notifications
   statusLogs: StatusLogMessage[];
   toasts: ToastMessage[];
+  sessionError: ActionableFeedback | null;
+  eventLogs: EventLogItem[];
+  setSessionError: (error: ActionableFeedback | null) => void;
+  addEventLog: (log: Omit<EventLogItem, 'id' | 'timestamp'>) => void;
+  clearEventLogs: () => void;
   addStatusLog: (text: string, type: 'info' | 'success' | 'error') => void;
   clearStatusLogs: () => void;
   addToast: (message: string, type?: 'info' | 'success' | 'error', duration?: number) => void;
@@ -471,6 +481,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Status & Logs
   statusLogs: [],
   toasts: [],
+  sessionError: null,
+  eventLogs: [],
+  setSessionError: error => set({ sessionError: error }),
+  addEventLog: log => {
+    const item: EventLogItem = {
+      id: Math.random().toString(36).slice(2),
+      timestamp: Date.now(),
+      ...log,
+    };
+    set(state => ({
+      eventLogs: [item, ...state.eventLogs.slice(0, 99)], // keep last 100 events
+    }));
+  },
+  clearEventLogs: () => set({ eventLogs: [] }),
   addStatusLog: (text, type) =>
     set(state => ({
       statusLogs: [
@@ -504,6 +528,157 @@ export const useAppStore = create<AppState>((set, get) => ({
       publishSession: null,
       publishFailures: [],
       detailedProgress: { ...INITIAL_DETAILED_PROGRESS },
+      sessionError: null,
     });
   },
 }));
+
+/**
+ * Single source of truth selector for all Status Center metrics.
+ * Mathematical guarantee: tracksReady exactly equals calculatePlaylistTiers track output.
+ */
+export function selectStatusMetrics(state: AppState): StatusMetrics {
+  const totalAlbums = state.albumListText
+    .split('\n')
+    .filter(line => line.trim().length > 0).length;
+
+  let processingStatus: 'idle' | 'processing' | 'completed' = 'idle';
+  let processedCount = 0;
+
+  if (
+    state.isProcessing ||
+    state.detailedProgress.stage === 'searching' ||
+    state.detailedProgress.stage === 'matching'
+  ) {
+    processingStatus = 'processing';
+    processedCount = state.detailedProgress.searching.current || state.progress.current || 0;
+  } else if (state.matchedAlbums.length > 0 || state.failedAlbums.length > 0) {
+    processingStatus = 'completed';
+    processedCount = state.matchedAlbums.length + state.failedAlbums.length;
+  } else {
+    processingStatus = 'idle';
+    processedCount = 0;
+  }
+
+  const albumWord = totalAlbums === 1 ? 'album' : 'albums';
+  let processingText = `Ready: 0 / ${totalAlbums} ${albumWord}`;
+  if (processingStatus === 'processing') {
+    processingText = `Processing: ${processedCount} / ${totalAlbums} ${albumWord}`;
+  } else if (processingStatus === 'completed') {
+    processingText = `Processed: ${processedCount} / ${totalAlbums} ${albumWord}`;
+  }
+
+  // Warnings breakdown (no double-counting with duplicate tracks)
+  let marketRestricted = 0;
+  let lowConfidence = 0;
+  let duplicateInputLine = 0;
+
+  state.matchedAlbums.forEach((item, idx) => {
+    if (getPlayabilityWarning(item.trackObjects) !== null) {
+      marketRestricted++;
+    }
+    if ((item.confidence ?? 0) < 0.5 && item.matchSource !== 'manual') {
+      lowConfidence++;
+    }
+    const isDupLine = state.matchedAlbums.some(
+      (other, oIdx) => oIdx !== idx && other.album?.id === item.album?.id
+    );
+    if (isDupLine) {
+      duplicateInputLine++;
+    }
+  });
+
+  const totalWarnings = marketRestricted + lowConfidence + duplicateInputLine;
+
+  // Errors breakdown
+  let notFound = 0;
+  let searchFailed = 0;
+  let skippedInvalid = 0;
+
+  state.failedAlbums.forEach(f => {
+    if (f.status === 'not_found') notFound++;
+    else if (f.status === 'search_failed' || f.status === 'error') searchFailed++;
+    else if (f.status === 'skipped') skippedInvalid++;
+  });
+
+  const batchFailures = state.publishFailures.length;
+  const totalErrors = notFound + searchFailed + skippedInvalid + batchFailures;
+
+  // Duplicates & Tracks Ready
+  const selectedAlbums = state.matchedAlbums.filter(a => a.selected !== false);
+  const totalTrackInstances = selectedAlbums.reduce(
+    (sum, a) => sum + (a.trackUris?.length || 0),
+    0
+  );
+
+  const uniqueTracksToPlan = new Set<string>();
+  selectedAlbums.forEach(a => {
+    a.trackUris?.forEach(uri => {
+      if (!state.existingTrackUris.has(uri)) {
+        uniqueTracksToPlan.add(uri);
+      }
+    });
+  });
+
+  const duplicatesCount = Math.max(0, totalTrackInstances - uniqueTracksToPlan.size);
+  const isPostPublish = Boolean(
+    state.publishSession &&
+      state.publishSession.batches.some(b => b.status === 'completed')
+  );
+  const duplicatesLabel = isPostPublish ? 'Duplicates skipped' : 'Duplicates to skip';
+
+  // Calculate tiers for exact track ready count (same algorithm as publishing)
+  const tiers = calculatePlaylistTiers(
+    selectedAlbums,
+    state.tierOptions,
+    state.existingTrackUris
+  );
+  const totalTracksReady = tiers.reduce((sum, t) => sum + t.tracks.length, 0);
+
+  let addedTracks: number | undefined;
+  let remainingTracks: number | undefined;
+
+  if (state.publishSession) {
+    const completedBatches = state.publishSession.batches.filter(b => b.status === 'completed');
+    addedTracks = completedBatches.reduce((sum, b) => sum + b.trackUris.length, 0);
+    remainingTracks = Math.max(0, totalTracksReady - addedTracks);
+  }
+
+  return {
+    processing: {
+      status: processingStatus,
+      current: processedCount,
+      total: totalAlbums,
+      text: processingText,
+    },
+    warnings: {
+      total: totalWarnings,
+      breakdown: {
+        marketRestricted,
+        lowConfidence,
+        duplicateInputLine,
+      },
+    },
+    errors: {
+      total: totalErrors,
+      breakdown: {
+        notFound,
+        searchFailed,
+        skippedInvalid,
+        batchFailures,
+      },
+    },
+    duplicates: {
+      count: duplicatesCount,
+      isPostPublish,
+      label: duplicatesLabel,
+      text: `${duplicatesLabel}: ${duplicatesCount}`,
+    },
+    tracksReady: {
+      total: totalTracksReady,
+      added: addedTracks,
+      remaining: remainingTracks,
+      text: `Tracks ready: ${totalTracksReady}`,
+    },
+  };
+}

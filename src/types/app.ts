@@ -58,7 +58,7 @@ export interface MatchedAlbum {
 }
 
 export interface FailedAlbum {
-  status: 'not_found' | 'error' | 'skipped' | 'cancelled';
+  status: 'not_found' | 'search_failed' | 'error' | 'skipped' | 'cancelled';
   line: string;
   artist: string;
   albumName: string;
@@ -166,3 +166,60 @@ export interface PublishFailure {
   status?: number;
   timestamp: number;
 }
+
+export interface StatusMetrics {
+  processing: {
+    status: 'idle' | 'processing' | 'completed';
+    current: number;
+    total: number;
+    text: string;
+  };
+  warnings: {
+    total: number;
+    breakdown: {
+      marketRestricted: number;
+      lowConfidence: number;
+      duplicateInputLine: number;
+    };
+  };
+  errors: {
+    total: number;
+    breakdown: {
+      notFound: number;
+      searchFailed: number;
+      skippedInvalid: number;
+      batchFailures: number;
+    };
+  };
+  duplicates: {
+    count: number;
+    isPostPublish: boolean;
+    label: string; // 'Duplicates to skip' or 'Duplicates skipped'
+    text: string;
+  };
+  tracksReady: {
+    total: number;
+    added?: number;
+    remaining?: number;
+    text: string;
+  };
+}
+
+export interface EventLogItem {
+  id: string;
+  timestamp: number;
+  severity: 'info' | 'warning' | 'error' | 'success';
+  itemLabel?: string;
+  message: string;
+  actionLabel?: string;
+  actionPayload?: unknown;
+}
+
+export interface SessionLevelError {
+  kind: string;
+  title: string;
+  detail: string;
+  actionLabel?: string;
+  actionType?: 'reconnect' | 'reauthorize_scope' | 'resume' | 'dismiss';
+}
+

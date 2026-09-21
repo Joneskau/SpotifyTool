@@ -13,6 +13,7 @@ import {
 } from '../schemas/spotifySchemas';
 import { useAppStore } from '../store/useAppStore';
 import { MatchedAlbum, ScoredCandidate, TrackObject, PublishSession } from '../types/app';
+import { HEADLINE_MARKET } from '../utils/errorFeedback';
 
 describe('Match Review Utilities', () => {
   describe('formatDuration', () => {
@@ -78,7 +79,7 @@ describe('Match Review Utilities', () => {
         { id: 't1', name: 'Track 1', uri: 'spotify:track:1', duration_ms: 180000, is_playable: true },
         { id: 't2', name: 'Track 2', uri: 'spotify:track:2', duration_ms: 200000, is_playable: false },
       ];
-      expect(getPlayabilityWarning(tracks)).toBe('Unavailable in your region');
+      expect(getPlayabilityWarning(tracks)).toBe(HEADLINE_MARKET);
     });
 
     it('returns warning when restrictions reason is market', () => {
@@ -91,7 +92,7 @@ describe('Match Review Utilities', () => {
           restrictions: { reason: 'market' },
         },
       ];
-      expect(getPlayabilityWarning(tracks)).toBe('Unavailable in your region');
+      expect(getPlayabilityWarning(tracks)).toBe(HEADLINE_MARKET);
     });
 
     it('returns null when all tracks are playable without market restrictions', () => {
